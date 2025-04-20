@@ -1,21 +1,195 @@
 # data_loader.py
 import os
+import csv
 import pandas as pd
-from datetime import datetime
+import requests
+from io import BytesIO
+from datetime import datetime, timedelta
+from PyPDF2 import PdfReader
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-# Directory where per-ticker CSVs are stored
-# Adjust this path to where your CSVs actually reside
-# default_output_dir = os.path.expanduser("~/Documents/scripts/processed/portfolio_stocks_pegasus")
-default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_pegasus")
+# Suppress HF progress bars
+os.environ["TRANSFORMERS_NO_TQDM"] = "1"
+from transformers import logging as hf_logging
+hf_logging.set_verbosity_error()
 
+# --- Load models once ---
+summarizer_bart = pipeline("summarization", model="facebook/bart-large-cnn")
+# Pegasus XSUM
+pegasus_tok = AutoTokenizer.from_pretrained("google/pegasus-xsum", use_fast=False)
+pegasus_mod = AutoModelForSeq2SeqLM.from_pretrained("google/pegasus-xsum")
+summarizer_pegasus = pipeline("summarization", model=pegasus_mod, tokenizer=pegasus_tok)
+# FLAN-T5
+flan_tok = AutoTokenizer.from_pretrained("google/flan-t5-large", use_fast=False)
+flan_mod = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-large")
+summarizer_t5 = pipeline("summarization", model=flan_mod, tokenizer=flan_tok)
 
-def update_filings_data():
+analyzer_vader = SentimentIntensityAnalyzer()
+classifier_finbert = pipeline("sentiment-analysis", model="yiyanghkust/finbert-tone")
+classifier_distilbert = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+
+# Config
+TICKERS = [
+    {"name": "NCC",             "bse_code": "500294"},
+    {"name": "JYOTHYLABS",     "bse_code": "532926"},
+    {"name": "SHEELAFOAM",     "bse_code": "540203"},
+    {"name": "KEC",             "bse_code": "532714"},
+    {"name": "KPIL",            "bse_code": "505283"},
+    {"name": "HCC",             "bse_code": "500185"},
+    {"name": "OLECTRA",         "bse_code": "532439"},
+    {"name": "LTF",             "bse_code": "533519"},
+    {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
+    {"name": "ABFRL",           "bse_code": "535755"},  # Aditya Birla Fashion & Retail
+    {"name": "SHK",             "bse_code": "539450"},  # S H Kelkar
+    {"name": "BLS",             "bse_code": "540073"},
+    {"name": "APOLLOTYRE",      "bse_code": "500877"},
+    {"name": "OMINFRA",         "bse_code": "531092"},
+    {"name": "TRITURBINE",      "bse_code": "533655"},
+    {"name": "PRAJIND",         "bse_code": "522205"},
+    {"name": "AHLUCONT",        "bse_code": "532811"},
+    {"name": "INDHOTEL",        "bse_code": "500850"},
+    {"name": "INDIGO",          "bse_code": "539448"},
+    {"name": "M&MFIN",          "bse_code": "532720"},
+    {"name": "PVRINOX",         "bse_code": "532689"},
+    {"name": "VIPIND",          "bse_code": "507880"},
+    {"name": "VGUARD",          "bse_code": "532953"},
+    {"name": "WABAG",           "bse_code": "533269"},  # VA Tech Wabag
+    {"name": "WONDERLA",        "bse_code": "538268"},
+    {"name": "AXISBANK",        "bse_code": "532215"},
+    {"name": "BATAINDIA",       "bse_code": "500033"},
+    {"name": "FLUIDOMAT",       "bse_code": "522017"},        # didn’t find a clear match—can you confirm the exact name?
+    {"name": "HDFCBANK",        "bse_code": "500180"},
+    {"name": "ICICIBANK",       "bse_code": "532174"},
+    {"name": "ITCHOTEL",        "bse_code": "500875"},  # ITC Hotels
+    {"name": "ITC",             "bse_code": "500875"},
+    {"name": "INFOSYS",         "bse_code": "500209"},
+    {"name": "KEI",             "bse_code": "505700"},
+    {"name": "LT",              "bse_code": "500510"},
+    {"name": "LEMONTREE",       "bse_code": "540063"},
+    {"name": "MANAPPURAM",      "bse_code": "531213"},
+    {"name": "PNB",             "bse_code": "532461"},
+    {"name": "SIEMENS",         "bse_code": "500650"},
+    {"name": "SWSOLAR",         "bse_code": "543248"},
+    {"name": "TATAMOTORS",      "bse_code": "500570"},
+    {"name": "VEDANTFASHION",   "bse_code": "543389"},
+    {"name": "VOLTAS",          "bse_code": "500575"},
+    {"name": "ANGELONE",        "bse_code": "543235"},
+    {"name": "BHEL",            "bse_code": "500103"},
+    {"name": "MOLDTEK",         "bse_code": "540287"},
+    {"name": "DABUR",           "bse_code": "500096"},
+    {"name": "HINDUNILVR",      "bse_code": "500696"},
+    {"name": "JUBLFOOD",        "bse_code": "543225"},
+    {"name": "KOTAKBANK",       "bse_code": "500247"},
+    {"name": "RIL",             "bse_code": "500325"}
+]
+BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
+HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+
+def update_filings_data(days=10, debug=False, status_callback=None, progress_callback=None,
+                        out_dir="data/portfolio_stocks_pegasus"):
     """
-    Dummy placeholder: implement your scraping+NLP pipeline here,
-    returning the count of new filings added.
+    Scrape and NLP process filings; append only new filings to existing ticker CSVs.
+    - days: lookback window
+    - debug: print debug logs
+    - status_callback(msg): update status text in UI
+    - progress_callback(fr): update progress bar (0.0-1.0)
+    - out_dir: folder where ticker CSVs reside
+    Returns total new records appended.
     """
-    # For now, just return 0 new filings
-    return 0
+    os.makedirs(out_dir, exist_ok=True)
+    start = datetime.today() - timedelta(days=days)
+    end = datetime.today()
+    prev = start.strftime("%Y%m%d")
+    to = end.strftime("%Y%m%d")
+
+    total_new = 0
+    n = len(tickers)
+    for i, tk in enumerate(tickers, 1):
+        # status/progress callbacks
+        if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
+        if progress_callback: progress_callback((i-1)/n)
+
+        # load existing URLs
+        csv_path = os.path.join(out_dir, f"{tk['name']}.csv")
+        existing_urls = set()
+        if os.path.isfile(csv_path):
+            try:
+                df_exist = pd.read_csv(csv_path)
+                existing_urls = set(df_exist['url'].dropna().astype(str))
+            except Exception:
+                existing_urls = set()
+
+        # fetch announcements
+        payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
+                   "strScrip":tk['bse_code'],"strSearch":"P",
+                   "strToDate":to,"strType":"C","subcategory":""}
+        ann = []
+        while True:
+            r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
+            if not r.ok: break
+            data = r.json().get('Table', [])
+            if not data: break
+            ann.extend(data)
+            payload['pageno'] += 1
+
+        # process
+        new_records = []
+        for item in ann:
+            attach = (item.get('ATTACHMENTNAME') or '').strip()
+            if not attach: continue
+            # try live, then his
+            pdf_url = None
+            for base in ['AttachLive','AttachHis']:
+                url = f"https://www.bseindia.com/xml-data/corpfiling/{base}/{attach}"
+                resp = requests.get(url, headers=HEADERS, timeout=10)
+                if resp.ok:
+                    pdf_url = url
+                    content = resp.content
+                    break
+            if not pdf_url or pdf_url in existing_urls:
+                continue
+            # extract date
+            raw = item.get('DissemDT','')
+            try: date = raw.split('T')[0]
+            except: date = end.strftime('%Y-%m-%d')
+            # extract text
+            text = ''
+            reader = PdfReader(BytesIO(content))
+            for pg in reader.pages:
+                text += (pg.extract_text() or '') + '\n'
+            if not text.strip(): continue
+            # summaries
+            sb = summarizer_bart(text[:1024], max_length=130, min_length=30)[0]['summary_text']
+            sp = summarizer_pegasus(text[:4096], max_length=130, min_length=30)[0]['summary_text']
+            st5 = summarizer_t5(text[:2048], max_length=130, min_length=30)[0]['summary_text']
+            # sentiments
+            vd = int(analyzer_vader.polarity_scores(sb)['compound']*100)
+            fb = classifier_finbert(sb)[0]
+            db = classifier_distilbert(sb)[0]
+
+            new_records.append({
+                'ticker':tk['name'],'code':tk['bse_code'],'date':date,
+                'sum_bart':sb,'sum_peg':sp,'sum_t5':st5,
+                'vader':vd,
+                'finbert':fb['label'],'finbert_s':round(fb['score'],3),
+                'distil':db['label'],'distil_s':round(db['score'],3),
+                'url':pdf_url
+            })
+
+        # append to CSV
+        if new_records:
+            write_header = not os.path.isfile(csv_path)
+            with open(csv_path,'a',newline='',encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=new_records[0].keys())
+                if write_header: writer.writeheader()
+                writer.writerows(new_records)
+            total_new += len(new_records)
+
+    # final callbacks
+    if progress_callback: progress_callback(1.0)
+    if status_callback: status_callback(f"Done: {total_new} new filings.")
+    return total_new
 
 
 def load_filtered_data(start_date=None, end_date=None):
