@@ -69,8 +69,7 @@ if refresh:
         days=days,
         debug=debug,
         status_callback=status,
-        progress_callback=progress,
-        out_dir=os.path.join(os.getcwd(), "data", "portfolio_stocks_pegasus")
+        progress_callback=progress
     )
     elapsed = time.time() - start_time
     status_ph.text(f"Completed in {elapsed:.1f}s — {new_count} new filings added.")
