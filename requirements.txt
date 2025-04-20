@@ -7,3 +7,4 @@ requests
 yfinance
 plotly
 feedparser
+lxml
