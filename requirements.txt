@@ -6,3 +6,4 @@ vaderSentiment
 requests
 yfinance
 plotly
+feedparser
