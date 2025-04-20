@@ -5,7 +5,8 @@ from datetime import datetime
 
 # Directory where per-ticker CSVs are stored
 # Adjust this path to where your CSVs actually reside
-default_output_dir = os.path.expanduser("~/Documents/scripts/processed/portfolio_stocks_pegasus")
+# default_output_dir = os.path.expanduser("~/Documents/scripts/processed/portfolio_stocks_pegasus")
+default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_pegasus")
 
 
 def update_filings_data():
