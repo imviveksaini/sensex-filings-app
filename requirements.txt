@@ -8,3 +8,5 @@ yfinance
 plotly
 feedparser
 lxml
+torch
+sentencepiece
