@@ -14,6 +14,10 @@ os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 from transformers import logging as hf_logging
 hf_logging.set_verbosity_error()
 
+# --- Constants & Directories ---
+default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_pegasus")
+os.makedirs(default_output_dir, exist_ok=True)
+
 # --- Load models once ---
 summarizer_bart = pipeline("summarization", model="facebook/bart-large-cnn")
 # Pegasus XSUM
@@ -27,10 +31,12 @@ summarizer_t5 = pipeline("summarization", model=flan_mod, tokenizer=flan_tok)
 
 analyzer_vader = SentimentIntensityAnalyzer()
 classifier_finbert = pipeline("sentiment-analysis", model="yiyanghkust/finbert-tone")
-classifier_distilbert = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+classifier_distilbert = pipeline(
+    "sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english"
+)
 
 # Config
-TICKERS = [
+tickers = [
     {"name": "NCC",             "bse_code": "500294"},
     {"name": "JYOTHYLABS",     "bse_code": "532926"},
     {"name": "SHEELAFOAM",     "bse_code": "540203"},
@@ -86,18 +92,12 @@ TICKERS = [
 BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
 HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
 
-def update_filings_data(days=10, debug=False, status_callback=None, progress_callback=None,
-                        out_dir="data/portfolio_stocks_pegasus"):
+
+def update_filings_data(days=10, debug=False, status_callback=None, progress_callback=None):
     """
     Scrape and NLP process filings; append only new filings to existing ticker CSVs.
-    - days: lookback window
-    - debug: print debug logs
-    - status_callback(msg): update status text in UI
-    - progress_callback(fr): update progress bar (0.0-1.0)
-    - out_dir: folder where ticker CSVs reside
     Returns total new records appended.
     """
-    os.makedirs(out_dir, exist_ok=True)
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
     prev = start.strftime("%Y%m%d")
@@ -106,21 +106,20 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
     total_new = 0
     n = len(tickers)
     for i, tk in enumerate(tickers, 1):
-        # status/progress callbacks
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
 
-        # load existing URLs
-        csv_path = os.path.join(out_dir, f"{tk['name']}.csv")
+        # Load existing URLs
+        csv_path = os.path.join(default_output_dir, f"{tk['name']}.csv")
         existing_urls = set()
         if os.path.isfile(csv_path):
             try:
                 df_exist = pd.read_csv(csv_path)
                 existing_urls = set(df_exist['url'].dropna().astype(str))
             except Exception:
-                existing_urls = set()
+                pass
 
-        # fetch announcements
+        # Fetch announcements
         payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
                    "strScrip":tk['bse_code'],"strSearch":"P",
                    "strToDate":to,"strType":"C","subcategory":""}
@@ -133,13 +132,11 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
             ann.extend(data)
             payload['pageno'] += 1
 
-        # process
         new_records = []
         for item in ann:
             attach = (item.get('ATTACHMENTNAME') or '').strip()
             if not attach: continue
-            # try live, then his
-            pdf_url = None
+            pdf_url, content = None, None
             for base in ['AttachLive','AttachHis']:
                 url = f"https://www.bseindia.com/xml-data/corpfiling/{base}/{attach}"
                 resp = requests.get(url, headers=HEADERS, timeout=10)
@@ -149,21 +146,23 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
                     break
             if not pdf_url or pdf_url in existing_urls:
                 continue
-            # extract date
+            # Extract date
             raw = item.get('DissemDT','')
             try: date = raw.split('T')[0]
             except: date = end.strftime('%Y-%m-%d')
-            # extract text
+            # Extract text
             text = ''
-            reader = PdfReader(BytesIO(content))
-            for pg in reader.pages:
-                text += (pg.extract_text() or '') + '\n'
+            try:
+                reader = PdfReader(BytesIO(content))
+                for pg in reader.pages:
+                    text += (pg.extract_text() or '') + '\n'
+            except:
+                continue
             if not text.strip(): continue
-            # summaries
+            # Summaries & sentiments
             sb = summarizer_bart(text[:1024], max_length=130, min_length=30)[0]['summary_text']
             sp = summarizer_pegasus(text[:4096], max_length=130, min_length=30)[0]['summary_text']
             st5 = summarizer_t5(text[:2048], max_length=130, min_length=30)[0]['summary_text']
-            # sentiments
             vd = int(analyzer_vader.polarity_scores(sb)['compound']*100)
             fb = classifier_finbert(sb)[0]
             db = classifier_distilbert(sb)[0]
@@ -177,7 +176,6 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
                 'url':pdf_url
             })
 
-        # append to CSV
         if new_records:
             write_header = not os.path.isfile(csv_path)
             with open(csv_path,'a',newline='',encoding='utf-8') as f:
@@ -186,10 +184,50 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
                 writer.writerows(new_records)
             total_new += len(new_records)
 
-    # final callbacks
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
+
+
+def load_filtered_data(start_date=None, end_date=None):
+    """
+    Reads all per-ticker CSVs, concatenates, and filters by date.
+    Expects columns: ticker, code, date, sum_bart, sum_peg, sum_t5,
+    vader, finbert, finbert_s, distil, distil_s, url
+    Returns DataFrame with:
+      - ticker_name, ticker_bse, date_of_filing,
+        summary columns, sentiment columns, url
+    """
+    if not os.path.isdir(default_output_dir):
+        return pd.DataFrame()
+
+    dfs = []
+    for fname in os.listdir(default_output_dir):
+        if not fname.endswith('.csv'): continue
+        path = os.path.join(default_output_dir, fname)
+        try:
+            df = pd.read_csv(path, parse_dates=['date'])
+            df = df.rename(columns={
+                'ticker':'ticker_name','code':'ticker_bse',
+                'date':'date_of_filing',
+                'sum_bart':'sum_bart','sum_peg':'sum_peg','sum_t5':'sum_t5',
+                'vader':'vader','finbert_s':'finbert_s','distil_s':'distil_s',
+                'url':'url'
+            })
+            dfs.append(df)
+        except Exception:
+            continue
+    if not dfs:
+        return pd.DataFrame()
+
+    full = pd.concat(dfs, ignore_index=True)
+    if start_date:
+        full = full[full['date_of_filing'] >= pd.to_datetime(start_date)]
+    if end_date:
+        full = full[full['date_of_filing'] <= pd.to_datetime(end_date)]
+    return full
+
+
 
 
 def load_filtered_data(start_date=None, end_date=None):
