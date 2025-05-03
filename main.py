@@ -102,11 +102,16 @@ end_date = st.sidebar.date_input(
 )
 
 # Load and filter data
+# Load and filter data
 df_all = load_filtered_data(start_date, end_date)
 all_tickers = sorted(df_all["ticker_name"].dropna().unique()) if not df_all.empty else []
-ticker_input = st.sidebar.selectbox("Enter ticker symbol:", [""] + all_tickers)
+ticker_input = st.sidebar.selectbox("Enter ticker symbol:", ["ALL"] + all_tickers)
 
-if ticker_input:
+# Filter data based on selection
+if ticker_input == "ALL":
+    df = df_all
+    st.success(f"Found {len(df)} filings across all tickers")
+else:
     df = df_all[df_all["ticker_name"].str.upper() == ticker_input.upper()]
     st.success(f"Found {len(df)} filings for {ticker_input}")
 
