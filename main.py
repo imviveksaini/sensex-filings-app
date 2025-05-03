@@ -58,7 +58,7 @@ st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 # Controls: update parameters
 st.sidebar.header("Controls")
 days = st.sidebar.number_input("Days to look back", min_value=1, max_value=365, value=10)
-debug = st.sidebar.checkbox("Debug mode", value=False)
+debug = True #st.sidebar.checkbox("Debug mode", value=False)
 refresh = st.sidebar.button("🔄 Refresh Filings Data")
 
 # Status and progress placeholders
