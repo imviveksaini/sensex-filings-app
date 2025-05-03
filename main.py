@@ -73,7 +73,8 @@ if refresh:
         days=days,
         debug=debug,
         status_callback=status,
-        progress_callback=progress
+        progress_callback=progress,
+        log_callback=log
     )
     # Later display logs if needed
     for line in log_msgs:
