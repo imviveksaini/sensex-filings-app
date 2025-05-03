@@ -109,13 +109,13 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
                 r.raise_for_status()
             except Exception as e:
-                if debug: print(f"Fetch error {ticker['name']}: {e}")
+                if debug: print(f"Fetch error {tickers['name']}: {e}")
                 break
             data = r.json().get("Table", [])
             if not data: break
             ann.extend(data)
             payload["pageno"] += 1
-        if debug: print(f"{ticker['name']}: {len(ann)} announcements")
+        if debug: print(f"{tickers['name']}: {len(ann)} announcements")
 
         new_records = []
         # Process each announcement
