@@ -14,6 +14,63 @@ os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
 os.makedirs(default_output_dir, exist_ok=True)
 
+# Config
+tickers = [
+    {"name": "NCC",             "bse_code": "500294"},
+    {"name": "JYOTHYLABS",     "bse_code": "532926"},
+    {"name": "SHEELAFOAM",     "bse_code": "540203"},
+    {"name": "KEC",             "bse_code": "532714"},
+    {"name": "KPIL",            "bse_code": "505283"},
+    {"name": "HCC",             "bse_code": "500185"},
+    {"name": "OLECTRA",         "bse_code": "532439"},
+    {"name": "LTF",             "bse_code": "533519"},
+    {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
+    {"name": "ABFRL",           "bse_code": "535755"},  # Aditya Birla Fashion & Retail
+    {"name": "SHK",             "bse_code": "539450"},  # S H Kelkar
+    {"name": "BLS",             "bse_code": "540073"},
+    {"name": "APOLLOTYRE",      "bse_code": "500877"},
+    {"name": "OMINFRA",         "bse_code": "531092"},
+    {"name": "TRITURBINE",      "bse_code": "533655"},
+    {"name": "PRAJIND",         "bse_code": "522205"},
+    {"name": "AHLUCONT",        "bse_code": "532811"},
+    {"name": "INDHOTEL",        "bse_code": "500850"},
+    {"name": "INDIGO",          "bse_code": "539448"},
+    {"name": "M&MFIN",          "bse_code": "532720"},
+    {"name": "PVRINOX",         "bse_code": "532689"},
+    {"name": "VIPIND",          "bse_code": "507880"},
+    {"name": "VGUARD",          "bse_code": "532953"},
+    {"name": "WABAG",           "bse_code": "533269"},  # VA Tech Wabag
+    {"name": "WONDERLA",        "bse_code": "538268"},
+    {"name": "AXISBANK",        "bse_code": "532215"},
+    {"name": "BATAINDIA",       "bse_code": "500033"},
+    {"name": "FLUIDOMAT",       "bse_code": "522017"},        # didn’t find a clear match—can you confirm the exact name?
+    {"name": "HDFCBANK",        "bse_code": "500180"},
+    {"name": "ICICIBANK",       "bse_code": "532174"},
+    {"name": "ITCHOTEL",        "bse_code": "500875"},  # ITC Hotels
+    {"name": "ITC",             "bse_code": "500875"},
+    {"name": "INFOSYS",         "bse_code": "500209"},
+    {"name": "KEI",             "bse_code": "505700"},
+    {"name": "LT",              "bse_code": "500510"},
+    {"name": "LEMONTREE",       "bse_code": "540063"},
+    {"name": "MANAPPURAM",      "bse_code": "531213"},
+    {"name": "PNB",             "bse_code": "532461"},
+    {"name": "SIEMENS",         "bse_code": "500650"},
+    {"name": "SWSOLAR",         "bse_code": "543248"},
+    {"name": "TATAMOTORS",      "bse_code": "500570"},
+    {"name": "VEDANTFASHION",   "bse_code": "543389"},
+    {"name": "VOLTAS",          "bse_code": "500575"},
+    {"name": "ANGELONE",        "bse_code": "543235"},
+    {"name": "BHEL",            "bse_code": "500103"},
+    {"name": "MOLDTEK",         "bse_code": "540287"},
+    {"name": "DABUR",           "bse_code": "500096"},
+    {"name": "HINDUNILVR",      "bse_code": "500696"},
+    {"name": "JUBLFOOD",        "bse_code": "543225"},
+    {"name": "KOTAKBANK",       "bse_code": "500247"},
+    {"name": "RIL",             "bse_code": "500325"}
+]
+BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
+HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+
 # Set your OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
