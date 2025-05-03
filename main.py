@@ -78,13 +78,17 @@ if refresh:
         log_callback=log
     )
 
-    # display logs in Streamlit UI (not terminal)
-    if debug and log_msgs:
-        st.text("\n".join(log_msgs))
+
     elapsed = time.time() - start_time
     status_ph.text(f"Completed in {elapsed:.1f}s — {new_count} new filings added.")
     progress_ph.empty()
 
+# display logs in Streamlit UI (not terminal)
+if debug and log_msgs:
+    st.subheader("🛠️ Debug Logs")
+    for msg in log_msgs:
+        st.text(msg)
+        
 # Date filters for viewing
 st.sidebar.subheader("📅 Date Range Filter")
 today = datetime.today().date()
