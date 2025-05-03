@@ -74,7 +74,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     total_new = 0
     n = len(tickers)
     if debug and log_callback:
-        log(f"{n} tickers to process from {start} to {end}")
+        log_callback(f"{n} tickers to process from {start} to {end}")
     #print(n, start, end)
 
     for i, tk in enumerate(tickers, 1):
@@ -99,15 +99,15 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
                 r.raise_for_status()
             except Exception as e:
-                if debug:
-                    log(f"Fetch error {tk['name']}: {e}")
+                if debug and log_callback:
+                    log_callback(f"Fetch error {tk['name']}: {e}")
                 break
             data = r.json().get("Table", [])
             if not data: break
             ann.extend(data)
             payload["pageno"] += 1
         if debug and log_callback:
-            log(f"{tk['name']}: {len(ann)} announcements")
+            log_callback(f"{tk['name']}: {len(ann)} announcements")
 
         new_records = []
         for item in ann:
@@ -133,7 +133,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     t = p.extract_text() or ""; text += t + "\n"
             except Exception as e:
                 if debug and log_callback:
-                    log(f"Extract error: {e}")
+                    log_callback(f"Extract error: {e}")
                 continue
             if not text.strip(): continue
 
@@ -146,9 +146,9 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             try:
                 summary, sentiment, category = gpt_response.split('\n')
                 if debug and log_callback:
-                    log(f"📝 Summary GPT: {summary}")
-                    log(f"📝 Sentiment GPT: {sentiment}")
-                    log(f"📝 Category GPT: {category}")
+                    log_callback(f"📝 Summary GPT: {summary}")
+                    log_callback(f"📝 Sentiment GPT: {sentiment}")
+                    log_callback(f"📝 Category GPT: {category}")
             except ValueError:
                 continue
 
