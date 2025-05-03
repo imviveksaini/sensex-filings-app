@@ -196,3 +196,40 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
+
+def load_filtered_data(start_date=None, end_date=None):
+    """
+    Reads all per-ticker CSVs, concatenates, and filters by date.
+    Expects columns: ticker, code, date, sum_bart, sum_peg, sum_t5,
+    vader, finbert, finbert_s, distil, distil_s, url
+    Returns DataFrame with:
+      - ticker_name, ticker_bse, date_of_filing,
+        summary columns, sentiment columns, url
+    """
+    if not os.path.isdir(default_output_dir):
+        return pd.DataFrame()
+
+    dfs = []
+    for fname in os.listdir(default_output_dir):
+        if not fname.endswith('.csv'): continue
+        path = os.path.join(default_output_dir, fname)
+        try:
+            df = pd.read_csv(path, parse_dates=['date'])
+            df = df.rename(columns={
+                'ticker':'ticker_name','code':'ticker_bse',
+                'date':'date_of_filing',
+                'summary_gpt':'summary_gpt','sentiment_gpt':'sentiment_gpt','category_gpt':'category_gpt',
+                'url':'url'
+            })
+            dfs.append(df)
+        except Exception:
+            continue
+    if not dfs:
+        return pd.DataFrame()
+
+    full = pd.concat(dfs, ignore_index=True)
+    if start_date:
+        full = full[full['date_of_filing'] >= pd.to_datetime(start_date)]
+    if end_date:
+        full = full[full['date_of_filing'] <= pd.to_datetime(end_date)]
+    return full
