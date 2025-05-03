@@ -8,38 +8,15 @@ from PyPDF2 import PdfReader
 import openai
 from openai import OpenAI
 
-# Suppress HF progress bars
-os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 
-# --- Constants & Directories ---
-default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
-os.makedirs(default_output_dir, exist_ok=True)
 
-# Config
-tickers = [
-    {"name": "NCC",             "bse_code": "500294"},
-    {"name": "JYOTHYLABS",     "bse_code": "532926"},
-    {"name": "SHEELAFOAM",     "bse_code": "540203"},
-    {"name": "KEC",             "bse_code": "532714"},
-    {"name": "KPIL",            "bse_code": "505283"},
-    {"name": "HCC",             "bse_code": "500185"},
-    {"name": "OLECTRA",         "bse_code": "532439"},
-    {"name": "LTF",             "bse_code": "533519"},
-    {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
-    {"name": "DABUR",           "bse_code": "500096"},
-    {"name": "HINDUNILVR",      "bse_code": "500696"},
-    {"name": "JUBLFOOD",        "bse_code": "543225"},
-    {"name": "KOTAKBANK",       "bse_code": "500247"},
-    {"name": "RIL",             "bse_code": "500325"}
-]
-BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
-HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
-# Retrieve the API key
-my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+
 
 
 
 def call_gpt(raw_input_text: str) -> dict:
+    # Retrieve the API key
+    my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
     try:
         client = OpenAI(api_key=my_api_key)
         user_prompt = f'''
@@ -73,6 +50,33 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
+    # Suppress HF progress bars
+    os.environ["TRANSFORMERS_NO_TQDM"] = "1"
+    
+    # --- Constants & Directories ---
+    default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
+    os.makedirs(default_output_dir, exist_ok=True)
+    
+    # Config
+    tickers = [
+        {"name": "NCC",             "bse_code": "500294"},
+        {"name": "JYOTHYLABS",     "bse_code": "532926"},
+        {"name": "SHEELAFOAM",     "bse_code": "540203"},
+        {"name": "KEC",             "bse_code": "532714"},
+        {"name": "KPIL",            "bse_code": "505283"},
+        {"name": "HCC",             "bse_code": "500185"},
+        {"name": "OLECTRA",         "bse_code": "532439"},
+        {"name": "LTF",             "bse_code": "533519"},
+        {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
+        {"name": "DABUR",           "bse_code": "500096"},
+        {"name": "HINDUNILVR",      "bse_code": "500696"},
+        {"name": "JUBLFOOD",        "bse_code": "543225"},
+        {"name": "KOTAKBANK",       "bse_code": "500247"},
+        {"name": "RIL",             "bse_code": "500325"}
+    ]
+    BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
+    HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
     prev = start.strftime("%Y%m%d")
