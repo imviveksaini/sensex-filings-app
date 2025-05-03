@@ -14,6 +14,8 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
     sentiment_map = {"sentiment_gpt": "sentiment_gpt"}
     summary_col = summary_map.get(summary_option, "summary_gpt")
     sentiment_col = sentiment_map.get(sentiment_option, "sentiment_gpt")
+    category_col = sentiment_map.get(sentiment_option, "category_gpt")
+    
 
     # Convert ticker to HTML link
     df = matches.copy()
@@ -27,6 +29,7 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
         sentiment = row.get(sentiment_col, 0)
         color = 'green' if sentiment > 0 else 'red' if sentiment < 0 else 'black'
         summary = row.get(summary_col, "")
+        category = row.get(category_col, "")
         link = f"<a href='{row.get('url')}' target='_blank'>🧾</a>" if row.get('url') else ''
         date_str = ''
         if pd.notna(row.get('date_of_filing')):
@@ -37,6 +40,7 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
             f"<td>{row.get('code','')}</td>"
             f"<td>{date_str}</td>"
             f"<td style='white-space:pre-wrap'>{summary}</td>"
+            f"<td style='white-space:pre-wrap'>{category}</td>"
             f"<td style='color:{color}'>{sentiment}</td>"
             f"<td>{link}</td>"
             f"</tr>"
