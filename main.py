@@ -20,6 +20,10 @@ from shareholding_pattern import show_shareholding_pattern
 from bse_insider_trades import show_bse_insider_trades
 from nse_bulk_block_short import show_nse_bulk_block_short_deals
 
+log_msgs = []
+def log(msg):
+    log_msgs.append(str(msg))
+    
 # Page configuration
 st.set_page_config(
     page_title="SENSEX Filings Viewer",
@@ -71,6 +75,9 @@ if refresh:
         status_callback=status,
         progress_callback=progress
     )
+    # Later display logs if needed
+    for line in log_msgs:
+        print(line)
     elapsed = time.time() - start_time
     status_ph.text(f"Completed in {elapsed:.1f}s — {new_count} new filings added.")
     progress_ph.empty()
