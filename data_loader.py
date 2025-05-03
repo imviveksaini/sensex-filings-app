@@ -84,6 +84,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
 
     total_new = 0
     n = len(tickers)
+    if debug: print(n, start, end)
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
@@ -104,38 +105,44 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                    "strToDate":to,"strType":"C","subcategory":""}
         ann = []
         while True:
-            r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
-            if not r.ok: break
-            data = r.json().get('Table', [])
+            try:
+                r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
+                r.raise_for_status()
+            except Exception as e:
+                if debug: print(f"Fetch error {ticker['name']}: {e}")
+                break
+            data = r.json().get("Table", [])
             if not data: break
             ann.extend(data)
-            payload['pageno'] += 1
+            payload["pageno"] += 1
+        if debug: print(f"{ticker['name']}: {len(ann)} announcements")
 
         new_records = []
+        # Process each announcement
         for item in ann:
-            attach = (item.get('ATTACHMENTNAME') or '').strip()
+            attach = item.get("ATTACHMENTNAME",""
+                           ).strip()
             if not attach: continue
-            pdf_url, content = None, None
-            for base in ['AttachLive','AttachHis']:
-                url = f"https://www.bseindia.com/xml-data/corpfiling/{base}/{attach}"
-                resp = requests.get(url, headers=HEADERS, timeout=10)
-                if resp.ok:
-                    pdf_url = url
-                    content = resp.content
-                    break
-            if not pdf_url or pdf_url in existing_urls:
-                continue
-            # Extract date
-            raw = item.get('DissemDT','')
-            try: date = raw.split('T')[0]
-            except: date = end.strftime('%Y-%m-%d')
+            # Download PDF
+            pdf = None; pdf_url = None
+            for path in [f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
+                         f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"]:
+                try:
+                    tmp = requests.get(path, headers=HEADERS, timeout=10)
+                    tmp.raise_for_status(); pdf=tmp.content; pdf_url=path; break
+                except: pass
+            if not pdf: continue
+            # Date
+            raw = item.get("DissemDT","")
+            try: d = raw.split("T")[0]; date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
+            except: date = datetime.today().strftime("%Y-%m-%d")
             # Extract text
-            text = ''
+            text="";
             try:
-                reader = PdfReader(BytesIO(content))
-                for pg in reader.pages:
-                    text += (pg.extract_text() or '') + '\n'
-            except:
+                for p in PdfReader(BytesIO(pdf)).pages:
+                    t=p.extract_text() or ""; text+=t+"\n"
+            except Exception as e:
+                if debug: print(f"Extract error: {e}")
                 continue
             if not text.strip(): continue
             
@@ -151,6 +158,11 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             # Split GPT response into summary, sentiment, and category
             try:
                 summary, sentiment, category = gpt_response.split('\n')
+                # Debug output of summaries and categories
+                if debug:
+                    print("📝 Summary GPT:", summary)
+                    print("📝 Sentiment GPT:", sentiment)
+                    print("📝 Category GPT:", category)
             except ValueError:
                 continue  # If splitting fails, skip this record
 
