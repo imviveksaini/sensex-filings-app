@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from PyPDF2 import PdfReader
 import openai
 from openai import OpenAI
+import streamlit as st
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
