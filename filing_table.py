@@ -1,4 +1,3 @@
-# filing_table.py
 import pandas as pd
 
 def render_filing_table(matches, summary_option="summary_gpt", sentiment_option="sentiment_gpt"):
@@ -12,10 +11,11 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
     # Map summary and sentiment column names
     summary_map = {"summary_gpt": "summary_gpt"}
     sentiment_map = {"sentiment_gpt": "sentiment_gpt"}
+    category_map = {"category_gpt": "category_gpt"}  # Added category map
+
     summary_col = summary_map.get(summary_option, "summary_gpt")
     sentiment_col = sentiment_map.get(sentiment_option, "sentiment_gpt")
-    category_col = sentiment_map.get(sentiment_option, "category_gpt")
-    
+    category_col = category_map.get("category_gpt", "category_gpt")  # Correct mapping
 
     # Convert ticker to HTML link
     df = matches.copy()
@@ -53,7 +53,7 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
         <thead>
             <tr>
                 <th>Ticker</th><th>BSE Code</th><th>Date</th>
-                <th>Summary ({summary_option})</th><th>Sentiment ({sentiment_option})</th><th>Link</th>
+                <th>Summary ({summary_option})</th><th>Category</th><th>Sentiment ({sentiment_option})</th><th>Link</th>
             </tr>
         </thead>
         <tbody>
