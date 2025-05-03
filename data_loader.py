@@ -60,15 +60,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     
     # Config
     tickers = [
-        {"name": "NCC",             "bse_code": "500294"},
-        {"name": "JYOTHYLABS",     "bse_code": "532926"},
-        {"name": "SHEELAFOAM",     "bse_code": "540203"},
-        {"name": "KEC",             "bse_code": "532714"},
-        {"name": "KPIL",            "bse_code": "505283"},
-        {"name": "HCC",             "bse_code": "500185"},
-        {"name": "OLECTRA",         "bse_code": "532439"},
-        {"name": "LTF",             "bse_code": "533519"},
-        {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
         {"name": "DABUR",           "bse_code": "500096"},
         {"name": "HINDUNILVR",      "bse_code": "500696"},
         {"name": "JUBLFOOD",        "bse_code": "543225"},
@@ -86,6 +77,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     total_new = 0
     n = len(tickers)
     if debug: print(n, start, end)
+    print(n, start, end)
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
@@ -118,7 +110,8 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             payload["pageno"] += 1
         if debug: print(f"{tk['name']}: {len(ann)} announcements")
         if debug: st.write(f"{tk['name']}: {len(ann)} announcements")
-
+        st.write(f"{tk['name']}: {len(ann)} announcements")
+        
         new_records = []
         # Process each announcement
         for item in ann:
