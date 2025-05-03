@@ -8,6 +8,7 @@ from PyPDF2 import PdfReader
 import openai
 from openai import OpenAI
 import streamlit as st
+import json
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
@@ -141,17 +142,37 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             raw_input_text = f"Text:\n{input_text}"
             gpt_response = call_gpt(raw_input_text)
             if debug and log_callback:
-                log_callback(f"{raw_input_text},gpt: {gpt_response}")
+                log_callback(f"Input: {raw_input_text}\nGPT raw: {gpt_response}")
+            
             if not gpt_response:
                 continue
-
+            
             try:
-                summary, sentiment, category = gpt_response.split('\n')
+                # Parse the JSON string from GPT
+                parsed = json.loads(gpt_response)
+            
+                summary = parsed.get('summary', '')
+                sentiment = parsed.get('sentiment', '')
+                category = parsed.get('category', '')
+            
                 if debug and log_callback:
                     log_callback(f"📝 Summary GPT: {summary}")
-                    log_callback(f"📝 Sentiment GPT: {sentiment}")
-                    log_callback(f"📝 Category GPT: {category}")
-            except ValueError:
+                    log_callback(f"📈 Sentiment GPT: {sentiment}")
+                    log_callback(f"🏷️ Category GPT: {category}")
+            
+                new_records.append({
+                    'ticker': tk['name'],
+                    'code': tk['bse_code'],
+                    'date': date,
+                    'summary_gpt': summary,
+                    'sentiment_gpt': sentiment,
+                    'category_gpt': category,
+                    'url': pdf_url
+                })
+            
+            except (ValueError, json.JSONDecodeError) as e:
+                if debug and log_callback:
+                    log_callback(f"⚠️ JSON parse error: {e}")
                 continue
 
             new_records.append({
