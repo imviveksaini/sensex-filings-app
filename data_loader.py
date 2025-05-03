@@ -151,7 +151,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             raw_input_text = (
                 f"Text:\n{input_text}"
             )
-            gpt_response = call_gpt(prompt)
+            gpt_response = call_gpt(raw_input_text)
             if not gpt_response:
                 continue
 
