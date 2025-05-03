@@ -1,20 +1,19 @@
 # filing_table.py
 import pandas as pd
 
-def render_filing_table(matches, summary_option="PEGASUS", sentiment_option="FinBERT"):
+def render_filing_table(matches, summary_option="summary_gpt", sentiment_option="sentiment_gpt"):
     """
     Renders a HTML table of filings allowing dynamic selection of summary and sentiment model.
     - matches: DataFrame with columns including:
         ticker_name, code, date_of_filing,
-        sum_bart, sum_peg, sum_t5,
-        vader, finbert_s, distil_s,
+        summary_gpt, sentiment_gpt, category_gpt,
         url
     """
     # Map summary and sentiment column names
-    summary_map = {"BART": "sum_bart", "PEGASUS": "sum_peg", "T5": "sum_t5"}
-    sentiment_map = {"VADER": "vader", "FinBERT": "finbert_s", "DistilBERT": "distil_s"}
-    summary_col = summary_map.get(summary_option, "sum_peg")
-    sentiment_col = sentiment_map.get(sentiment_option, "finbert_s")
+    summary_map = {"summary_gpt": "summary_gpt"}
+    sentiment_map = {"sentiment_gpt": "sentiment_gpt"}
+    summary_col = summary_map.get(summary_option, "summary_gpt")
+    sentiment_col = sentiment_map.get(sentiment_option, "sentiment_gpt")
 
     # Convert ticker to HTML link
     df = matches.copy()
