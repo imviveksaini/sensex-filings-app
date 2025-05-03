@@ -8,7 +8,12 @@ from PyPDF2 import PdfReader
 import openai
 from openai import OpenAI
 
+# Suppress HF progress bars
+os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 
+# --- Constants & Directories ---
+default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
+os.makedirs(default_output_dir, exist_ok=True)
 
 
 
@@ -50,12 +55,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
-    # Suppress HF progress bars
-    os.environ["TRANSFORMERS_NO_TQDM"] = "1"
-    
-    # --- Constants & Directories ---
-    default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
-    os.makedirs(default_output_dir, exist_ok=True)
+
     
     # Config
     tickers = [
