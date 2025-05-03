@@ -117,6 +117,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             ann.extend(data)
             payload["pageno"] += 1
         if debug: print(f"{tk['name']}: {len(ann)} announcements")
+        if debug: st.write(f"{tk['name']}: {len(ann)} announcements")
 
         new_records = []
         # Process each announcement
@@ -164,6 +165,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     print("📝 Summary GPT:", summary)
                     print("📝 Sentiment GPT:", sentiment)
                     print("📝 Category GPT:", category)
+                    
             except ValueError:
                 continue  # If splitting fails, skip this record
 
