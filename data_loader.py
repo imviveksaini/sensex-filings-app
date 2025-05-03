@@ -229,6 +229,7 @@ def load_filtered_data(start_date=None, end_date=None):
         return pd.DataFrame()
 
     full = pd.concat(dfs, ignore_index=True)
+    full = full.drop_duplicates()
     if start_date:
         full = full[full['date_of_filing'] >= pd.to_datetime(start_date)]
     if end_date:
