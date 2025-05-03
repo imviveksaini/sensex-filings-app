@@ -46,7 +46,7 @@ def call_gpt(raw_input_text: str) -> dict:
             ],
             response_format={"type": "json_object"}
         )
-        return response['choices'][0]['message']['content']
+        return response.choices[0].message.content
     except Exception as e:
         print(f"GPT API call failed: {e}")
         return None
