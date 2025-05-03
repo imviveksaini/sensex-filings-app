@@ -102,29 +102,11 @@ end_date = st.sidebar.date_input(
 )
 
 # Load and filter data
-# Load and filter data
 df_all = load_filtered_data(start_date, end_date)
 all_tickers = sorted(df_all["ticker_name"].dropna().unique()) if not df_all.empty else []
-ticker_input = st.sidebar.selectbox("Enter ticker symbol:", ["ALL"] + all_tickers)
+ticker_input = st.sidebar.selectbox("Enter ticker symbol:", [""] + all_tickers)
 
-# Filter data based on selection
-if ticker_input == "":
-    st.info("Please select a ticker from the sidebar.")
-elif ticker_input == "ALL":
-    df = df_all
-    st.success(f"Found {len(df)} filings across all tickers")
-
-    # You can optionally show a unified table here too
-    tab1, _, _, _, _ = st.tabs([
-        "📑 Filings Table", "📈 Sentiment Trend",
-        "💹 Price Chart", "📰 News", "💼 Deals & Metrics"
-    ])
-    with tab1:
-        st.subheader("Filings Table: ALL Tickers")
-        html = render_filing_table(df)
-        st.markdown(html, unsafe_allow_html=True)
-
-else:
+if ticker_input:
     df = df_all[df_all["ticker_name"].str.upper() == ticker_input.upper()]
     st.success(f"Found {len(df)} filings for {ticker_input}")
 
@@ -162,3 +144,6 @@ else:
         show_bse_insider_trades(ticker_input)
         st.subheader("💼 NSE Bulk/Block/Short Deals")
         show_nse_bulk_block_short_deals(ticker_input)
+
+else:
+    st.info("Please select a ticker from the sidebar.")
