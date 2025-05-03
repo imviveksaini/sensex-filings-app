@@ -104,13 +104,7 @@ if ticker_input:
 
     with tab1:
         st.subheader(f"Filings Table: {ticker_input}")
-        summary_option = st.selectbox(
-            "Summary model:", ["PEGASUS", "BART", "T5"], index=0
-        )
-        sentiment_option = st.selectbox(
-            "Sentiment model:", ["FinBERT", "VADER", "DistilBERT"], index=0
-        )
-        html = render_filing_table(df, summary_option, sentiment_option)
+        html = render_filing_table(df)
         st.markdown(html, unsafe_allow_html=True)
 
     with tab2:
