@@ -6,6 +6,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from PyPDF2 import PdfReader
 import openai
+from openai import OpenAI
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
@@ -25,43 +26,6 @@ tickers = [
     {"name": "OLECTRA",         "bse_code": "532439"},
     {"name": "LTF",             "bse_code": "533519"},
     {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
-    {"name": "ABFRL",           "bse_code": "535755"},  # Aditya Birla Fashion & Retail
-    {"name": "SHK",             "bse_code": "539450"},  # S H Kelkar
-    {"name": "BLS",             "bse_code": "540073"},
-    {"name": "APOLLOTYRE",      "bse_code": "500877"},
-    {"name": "OMINFRA",         "bse_code": "531092"},
-    {"name": "TRITURBINE",      "bse_code": "533655"},
-    {"name": "PRAJIND",         "bse_code": "522205"},
-    {"name": "AHLUCONT",        "bse_code": "532811"},
-    {"name": "INDHOTEL",        "bse_code": "500850"},
-    {"name": "INDIGO",          "bse_code": "539448"},
-    {"name": "M&MFIN",          "bse_code": "532720"},
-    {"name": "PVRINOX",         "bse_code": "532689"},
-    {"name": "VIPIND",          "bse_code": "507880"},
-    {"name": "VGUARD",          "bse_code": "532953"},
-    {"name": "WABAG",           "bse_code": "533269"},  # VA Tech Wabag
-    {"name": "WONDERLA",        "bse_code": "538268"},
-    {"name": "AXISBANK",        "bse_code": "532215"},
-    {"name": "BATAINDIA",       "bse_code": "500033"},
-    {"name": "FLUIDOMAT",       "bse_code": "522017"},        # didn’t find a clear match—can you confirm the exact name?
-    {"name": "HDFCBANK",        "bse_code": "500180"},
-    {"name": "ICICIBANK",       "bse_code": "532174"},
-    {"name": "ITCHOTEL",        "bse_code": "500875"},  # ITC Hotels
-    {"name": "ITC",             "bse_code": "500875"},
-    {"name": "INFOSYS",         "bse_code": "500209"},
-    {"name": "KEI",             "bse_code": "505700"},
-    {"name": "LT",              "bse_code": "500510"},
-    {"name": "LEMONTREE",       "bse_code": "540063"},
-    {"name": "MANAPPURAM",      "bse_code": "531213"},
-    {"name": "PNB",             "bse_code": "532461"},
-    {"name": "SIEMENS",         "bse_code": "500650"},
-    {"name": "SWSOLAR",         "bse_code": "543248"},
-    {"name": "TATAMOTORS",      "bse_code": "500570"},
-    {"name": "VEDANTFASHION",   "bse_code": "543389"},
-    {"name": "VOLTAS",          "bse_code": "500575"},
-    {"name": "ANGELONE",        "bse_code": "543235"},
-    {"name": "BHEL",            "bse_code": "500103"},
-    {"name": "MOLDTEK",         "bse_code": "540287"},
     {"name": "DABUR",           "bse_code": "500096"},
     {"name": "HINDUNILVR",      "bse_code": "500696"},
     {"name": "JUBLFOOD",        "bse_code": "543225"},
@@ -70,26 +34,41 @@ tickers = [
 ]
 BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
 HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+# Retrieve the API key
+my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
 
-# Set your OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def call_gpt(prompt: str) -> dict:
+
+def call_gpt(raw_input_text: str) -> dict:
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+        client = OpenAI(api_key=my_api_key)
+        user_prompt = f'''
+        You're an expert in reading corporate filings on Indian stocks.
+        
+        Understand the following filing and analyze it carefully.
+        
+        Respond **only** in valid JSON format with exactly two keys:
+        1. "summary": a brief summary of the filing in maximum two sentences.
+        2. "sentiment": how bullish are you on its stock based on the information in the filing. 100= very bullish, -100= very bearish.
+        3. "category": summarise this news between 1-3 words only.
+        Filing text:
+        {raw_input_text}
+        '''
+        
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano",
+            temperature=0,
             messages=[
-                {"role": "system", "content": "You are a financial analyst AI assistant."},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": user_prompt}
             ],
-            temperature=0.0,
+            response_format={"type": "json_object"}
         )
         return response['choices'][0]['message']['content']
     except Exception as e:
         print(f"GPT API call failed: {e}")
         return None
 
-def update_filings_data(days=10, debug=False, status_callback=None, progress_callback=None):
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
@@ -158,11 +137,7 @@ def update_filings_data(days=10, debug=False, status_callback=None, progress_cal
             
             # Call GPT-based analysis
             input_text = text[:4000]  # Truncate to avoid token overflow
-            prompt = (
-                f"Please analyze the following financial disclosure and provide:\n"
-                f"1. A concise summary\n"
-                f"2. The overall sentiment (Positive, Neutral, Negative)\n"
-                f"3. Categorize the filing (e.g., financials, strategy, earnings)\n"
+            raw_input_text = (
                 f"Text:\n{input_text}"
             )
             gpt_response = call_gpt(prompt)
