@@ -10,3 +10,4 @@ feedparser
 lxml
 torch
 sentencepiece
+openai
