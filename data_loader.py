@@ -51,7 +51,7 @@ def call_gpt(raw_input_text: str) -> dict:
         print(f"GPT API call failed: {e}")
         return None
 
-def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None):
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
@@ -73,7 +73,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
 
     total_new = 0
     n = len(tickers)
-    if debug:
+    if debug and log_callback:
         log(f"{n} tickers to process from {start} to {end}")
     #print(n, start, end)
 
@@ -106,7 +106,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             if not data: break
             ann.extend(data)
             payload["pageno"] += 1
-        if debug:
+        if debug and log_callback:
             log(f"{tk['name']}: {len(ann)} announcements")
 
         new_records = []
@@ -132,7 +132,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 for p in PdfReader(BytesIO(pdf)).pages:
                     t = p.extract_text() or ""; text += t + "\n"
             except Exception as e:
-                if debug:
+                if debug and log_callback:
                     log(f"Extract error: {e}")
                 continue
             if not text.strip(): continue
@@ -145,7 +145,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
 
             try:
                 summary, sentiment, category = gpt_response.split('\n')
-                if debug:
+                if debug and log_callback:
                     log(f"📝 Summary GPT: {summary}")
                     log(f"📝 Sentiment GPT: {sentiment}")
                     log(f"📝 Category GPT: {category}")
