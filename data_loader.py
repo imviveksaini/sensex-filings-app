@@ -56,9 +56,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
-
-    
-    # Config
     tickers = [
         {"name": "DABUR",           "bse_code": "500096"},
         {"name": "HINDUNILVR",      "bse_code": "500696"},
@@ -76,13 +73,14 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
 
     total_new = 0
     n = len(tickers)
-    if debug: print(n, start, end)
-    print(n, start, end)
+    if debug:
+        log(f"{n} tickers to process from {start} to {end}")
+    #print(n, start, end)
+
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
 
-        # Load existing URLs
         csv_path = os.path.join(default_output_dir, f"{tk['name']}.csv")
         existing_urls = set()
         if os.path.isfile(csv_path):
@@ -92,7 +90,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             except Exception:
                 pass
 
-        # Fetch announcements
         payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
                    "strScrip":tk['bse_code'],"strSearch":"P",
                    "strToDate":to,"strType":"C","subcategory":""}
@@ -102,23 +99,21 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
                 r.raise_for_status()
             except Exception as e:
-                if debug: print(f"Fetch error {tk['name']}: {e}")
+                if debug:
+                    log(f"Fetch error {tk['name']}: {e}")
                 break
             data = r.json().get("Table", [])
             if not data: break
             ann.extend(data)
             payload["pageno"] += 1
-        if debug: print(f"{tk['name']}: {len(ann)} announcements")
-        if debug: st.write(f"{tk['name']}: {len(ann)} announcements")
-        st.write(f"{tk['name']}: {len(ann)} announcements")
-        
+        if debug:
+            log(f"{tk['name']}: {len(ann)} announcements")
+
         new_records = []
-        # Process each announcement
         for item in ann:
-            attach = item.get("ATTACHMENTNAME",""
-                           ).strip()
+            attach = item.get("ATTACHMENTNAME","").strip()
             if not attach: continue
-            # Download PDF
+
             pdf = None; pdf_url = None
             for path in [f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
                          f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"]:
@@ -127,40 +122,35 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     tmp.raise_for_status(); pdf=tmp.content; pdf_url=path; break
                 except: pass
             if not pdf: continue
-            # Date
+
             raw = item.get("DissemDT","")
             try: d = raw.split("T")[0]; date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
             except: date = datetime.today().strftime("%Y-%m-%d")
-            # Extract text
-            text="";
+
+            text = ""
             try:
                 for p in PdfReader(BytesIO(pdf)).pages:
-                    t=p.extract_text() or ""; text+=t+"\n"
+                    t = p.extract_text() or ""; text += t + "\n"
             except Exception as e:
-                if debug: print(f"Extract error: {e}")
+                if debug:
+                    log(f"Extract error: {e}")
                 continue
             if not text.strip(): continue
-            
-            # Call GPT-based analysis
-            input_text = text[:4000]  # Truncate to avoid token overflow
-            raw_input_text = (
-                f"Text:\n{input_text}"
-            )
+
+            input_text = text[:4000]
+            raw_input_text = f"Text:\n{input_text}"
             gpt_response = call_gpt(raw_input_text)
             if not gpt_response:
                 continue
 
-            # Split GPT response into summary, sentiment, and category
             try:
                 summary, sentiment, category = gpt_response.split('\n')
-                # Debug output of summaries and categories
                 if debug:
-                    print("📝 Summary GPT:", summary)
-                    print("📝 Sentiment GPT:", sentiment)
-                    print("📝 Category GPT:", category)
-                    
+                    log(f"📝 Summary GPT: {summary}")
+                    log(f"📝 Sentiment GPT: {sentiment}")
+                    log(f"📝 Category GPT: {category}")
             except ValueError:
-                continue  # If splitting fails, skip this record
+                continue
 
             new_records.append({
                 'ticker': tk['name'],
@@ -183,6 +173,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
+
 
 def load_filtered_data(start_date=None, end_date=None):
     """
