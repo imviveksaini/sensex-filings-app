@@ -37,11 +37,13 @@ You're an expert in reading news stories, research reports, and other financial 
 Understand the following filing and analyze it carefully.
 
 Respond **only** in valid JSON format with exactly the following keys:
-1. "summary": a brief summary of the text in maximum two sentences.
-2. "sentiment": how bullish are you on its stock based on the information in the text. 100 = very bullish, -100 = very bearish.
+1. "summary": a brief summary of the text in maximum two sentences, bullet points.
+2. "bullishness_indicator (-100 to 100)": how bullish are you on its stock based on the information in the text. 100 = very bullish, -100 = very bearish.
 3. "headwinds": if you found any business headwinds, write here. Maximum 3 lines, bullet points.
 4. "tailwinds": if you found any business tailwinds, write here. Maximum 3 lines, bullet points.
 5. "key_forward_looking_statements": Write here if you found any forward-looking statements. Maximum 3 lines, bullet points.
+6. "potential_upside": If available, give analyst target price and potential upside in %.
+
 
 Filing text:
 {raw_input_text}
