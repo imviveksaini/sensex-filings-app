@@ -49,7 +49,7 @@ def call_gpt_for_summary(raw_input_text: str) -> dict | None:
         user_prompt = f'''
 You're an expert in reading news stories, research reports, and other financial texts on Indian stocks.
 
-Understand the following filing and analyze it carefully.
+Understand the following text and analyze it carefully.
 
 Respond **only** in valid JSON format with exactly the following keys:
 1. "summary": a brief summary of the text. Maximum 2 lines, bullet points.
