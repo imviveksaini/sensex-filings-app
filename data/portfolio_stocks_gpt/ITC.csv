@@ -1,0 +1,2 @@
+ticker,code,date,summary_gpt,sentiment_gpt,category_gpt,url
+ITC,500875,2025-05-02,"The filing reports the dematerialisation of shares by ITC Limited during April 2025, with detailed records of share certificates processed and verified. No rematerialisation was required during this period, indicating ongoing compliance with depository regulations.",0,regulatory_update,https://www.bseindia.com/xml-data/corpfiling/AttachLive/902e1876-91bd-4b5c-86ae-47099324b0ba.pdf
