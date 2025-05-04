@@ -64,7 +64,7 @@ def summarize_filing_from_url(pdf_url: str) -> str | None:
     if not text:
         return "❌ No text could be extracted from the PDF."
 
-    gpt_response = call_gpt(text)
+    gpt_response = call_gpt_for_summary(text)
     if not gpt_response:
         return "❌ Failed to get GPT summary."
 
