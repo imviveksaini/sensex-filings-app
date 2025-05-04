@@ -20,6 +20,13 @@ from shareholding_pattern import show_shareholding_pattern
 from bse_insider_trades import show_bse_insider_trades
 from nse_bulk_block_short import show_nse_bulk_block_short_deals
 
+magic_key_actual = st.secrets.get("MAGIC_KEY", os.getenv("MAGIC_KEY"))
+
+log_msgs = []
+
+def log(msg):
+    log_msgs.append(str(msg))
+    
 # Page configuration
 st.set_page_config(
     page_title="SENSEX Filings Viewer",
@@ -53,12 +60,24 @@ st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 # Controls: update parameters
 st.sidebar.header("Controls")
 days = st.sidebar.number_input("Days to look back", min_value=1, max_value=365, value=10)
-debug = st.sidebar.checkbox("Debug mode", value=False)
-refresh = st.sidebar.button("🔄 Refresh Filings Data")
+
+debug = True #st.sidebar.checkbox("Debug mode", value=False)
+# Input for magic key (passcode)
+magic_key_entered = st.sidebar.text_input("Enter Magic Key to Refresh", type="password")
+refresh_button = st.sidebar.button("🔄 Refresh Filings Data")
 
 # Status and progress placeholders
 status_ph = st.sidebar.empty()
 progress_ph = st.sidebar.progress(0)
+
+# Check magic key before triggering refresh
+refresh = False
+if refresh_button:
+    if magic_key_entered == magic_key_actual:
+        refresh = True
+        status_ph.success("✅ Magic key accepted. Refresh triggered.")
+    else:
+        status_ph.error("❌ Incorrect magic key. Refresh not allowed.")
 
 if refresh:
     start_time = time.time()
@@ -69,12 +88,21 @@ if refresh:
         days=days,
         debug=debug,
         status_callback=status,
-        progress_callback=progress
+        progress_callback=progress,
+        log_callback=log
     )
+
+
     elapsed = time.time() - start_time
     status_ph.text(f"Completed in {elapsed:.1f}s — {new_count} new filings added.")
     progress_ph.empty()
 
+# display logs in Streamlit UI (not terminal)
+if debug and log_msgs:
+    st.subheader("🛠️ Debug Logs")
+    for msg in log_msgs:
+        st.text(msg)
+        
 # Date filters for viewing
 st.sidebar.subheader("📅 Date Range Filter")
 today = datetime.today().date()
@@ -90,9 +118,24 @@ end_date = st.sidebar.date_input(
 # Load and filter data
 df_all = load_filtered_data(start_date, end_date)
 all_tickers = sorted(df_all["ticker_name"].dropna().unique()) if not df_all.empty else []
-ticker_input = st.sidebar.selectbox("Enter ticker symbol:", [""] + all_tickers)
+ticker_input = st.sidebar.selectbox("Enter ticker symbol:", ["ALL"] + all_tickers)
 
-if ticker_input:
+if ticker_input == "ALL":
+    df = df_all
+    df = df.sort_values(by="date_of_filing", ascending=False)
+    st.success(f"Found {len(df)} filings across all tickers")
+
+    # You can optionally show a unified table here too
+    tab1, _, _, _, _ = st.tabs([
+        "📑 Filings Table", "📈 Sentiment Trend",
+        "💹 Price Chart", "📰 News", "💼 Deals & Metrics"
+    ])
+    with tab1:
+        st.subheader("Filings Table: ALL Tickers")
+        html = render_filing_table(df)
+        st.markdown(html, unsafe_allow_html=True)
+
+else:
     df = df_all[df_all["ticker_name"].str.upper() == ticker_input.upper()]
     st.success(f"Found {len(df)} filings for {ticker_input}")
 
@@ -104,13 +147,7 @@ if ticker_input:
 
     with tab1:
         st.subheader(f"Filings Table: {ticker_input}")
-        summary_option = st.selectbox(
-            "Summary model:", ["PEGASUS", "BART", "T5"], index=0
-        )
-        sentiment_option = st.selectbox(
-            "Sentiment model:", ["FinBERT", "VADER", "DistilBERT"], index=0
-        )
-        html = render_filing_table(df, summary_option, sentiment_option)
+        html = render_filing_table(df)
         st.markdown(html, unsafe_allow_html=True)
 
     with tab2:
@@ -136,6 +173,3 @@ if ticker_input:
         show_bse_insider_trades(ticker_input)
         st.subheader("💼 NSE Bulk/Block/Short Deals")
         show_nse_bulk_block_short_deals(ticker_input)
-
-else:
-    st.info("Please select a ticker from the sidebar.")
