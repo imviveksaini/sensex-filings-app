@@ -73,7 +73,7 @@ tickers = [
 ]
 
 def upload_to_github(filepath, repo, path_in_repo, branch="main_sensex"):
-    token = st.secrets.get("GITHUB_TOKEN", os.getenv("OPENAI_API_KEY"))
+    token = st.secrets.get("GITHUB_TOKEN", os.getenv("GITHUB_TOKEN"))
     if not token:
         raise ValueError("GitHub token not found")
 
