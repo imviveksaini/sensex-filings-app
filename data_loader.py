@@ -45,7 +45,7 @@ tickers = [
     {"name": "WABAG",           "bse_code": "533269"},  # VA Tech Wabag
     {"name": "WONDERLA",        "bse_code": "538268"},
     {"name": "AXISBANK",        "bse_code": "532215"},
-    {"name": "BATAINDIA",       "bse_code": "500033"},
+    {"name": "BATAINDIA",       "bse_code": "500043"},
     {"name": "FLUIDOMAT",       "bse_code": "522017"},        
     {"name": "HDFCBANK",        "bse_code": "500180"},
     {"name": "ICICIBANK",       "bse_code": "532174"},
