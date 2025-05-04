@@ -1,0 +1,2 @@
+ticker,code,date,summary_gpt,sentiment_gpt,category_gpt,url
+TRITURBINE,533655,2025-05-02,"The filing announces a scheduled Board meeting on May 10, 2025, to approve the company's audited financial results for Q4 and FY2025 and to consider dividend recommendations. It also notes the continuation of the trading window closure for insiders until after the results are published.",10,earnings_call_transcript,https://www.bseindia.com/xml-data/corpfiling/AttachLive/4fb48f50-156f-4791-83b9-42d400c0c620.pdf
