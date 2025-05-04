@@ -28,6 +28,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
 
 def call_gpt_for_summary(raw_input_text: str) -> dict | None:
     try:
+        my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         client = OpenAI(api_key=my_api_key)
         user_prompt = f'''
 You're an expert in reading news stories, research reports, and other financial texts on Indian stocks.
