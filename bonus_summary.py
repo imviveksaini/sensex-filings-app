@@ -5,6 +5,7 @@ from io import BytesIO
 from PyPDF2 import PdfReader
 from openai import OpenAI
 import os
+import streamlit as st
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -61,10 +62,11 @@ def summarize_filing_from_url(pdf_url: str) -> str | None:
     if not pdf:
         return "❌ Failed to download PDF."
 
-    text = extract_text_from_pdf(pdf)
+    text = extract_text_from_pdf(pdf)    
     if not text:
         return "❌ No text could be extracted from the PDF."
 
+    text =text[:4000]
     gpt_response = call_gpt_for_summary(text)
     if not gpt_response:
         return "❌ Failed to get GPT summary."
