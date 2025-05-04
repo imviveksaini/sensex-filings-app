@@ -9,15 +9,44 @@ import openai
 from openai import OpenAI
 import streamlit as st
 import json
+import base64
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 
 # --- Constants & Directories ---
-default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
-os.makedirs(default_output_dir, exist_ok=True)
+#default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
+#os.makedirs(default_output_dir, exist_ok=True)
 
+def upload_to_github(filepath, repo, path_in_repo, branch="main_sensex"):
+    token = st.secrets.get("GITHUB_TOKEN", os.getenv("OPENAI_API_KEY"))
+    if not token:
+        raise ValueError("GitHub token not found")
 
+    with open(filepath, "rb") as f:
+        content = f.read()
+    content_b64 = base64.b64encode(content).decode()
+
+    url = f"https://api.github.com/repos/{repo}/contents/{path_in_repo}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    get_resp = requests.get(url, headers=headers, params={"ref": branch})
+    sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+
+    data = {
+        "message": f"Upload {path_in_repo}",
+        "content": content_b64,
+        "branch": branch
+    }
+    if sha:
+        data["sha"] = sha
+
+    put_resp = requests.put(url, headers=headers, json=data)
+    if put_resp.status_code not in (200, 201):
+        raise Exception(f"Upload failed: {put_resp.status_code} - {put_resp.text}")
 
 
 
@@ -80,7 +109,8 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
 
-        csv_path = os.path.join(default_output_dir, f"{tk['name']}.csv")
+        #csv_path = os.path.join(default_output_dir, f"{tk['name']}.csv")
+        csv_path = f"data/portfolio_stocks_gpt/{tk['name']}.csv"
         existing_urls = set()
         if os.path.isfile(csv_path):
             try:
@@ -191,6 +221,18 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 writer.writerows(new_records)
             total_new += len(new_records)
 
+            # ✅ Upload to GitHub
+            try:
+                upload_to_github(
+                    filepath=csv_path,
+                    repo="imviveksaini/sensex-filings-app",
+                    path_in_repo=f"data/portfolio_stocks_gpt/{tk['name']}.csv",
+                    branch="main_sensex"
+                )
+            except Exception as e:
+                if debug and log_callback:
+                    log_callback(f"GitHub upload failed for {tk['name']}: {e}")
+
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
@@ -205,8 +247,8 @@ def load_filtered_data(start_date=None, end_date=None):
       - ticker_name, ticker_bse, date_of_filing,
         summary columns, sentiment columns, url
     """
-    if not os.path.isdir(default_output_dir):
-        return pd.DataFrame()
+    base_url = "https://raw.githubusercontent.com/imviveksaini/sensex-filings-app/main_sensex/data/portfolio_stocks_gpt"
+
 
     dfs = []
     for fname in os.listdir(default_output_dir):
