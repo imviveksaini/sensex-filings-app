@@ -50,6 +50,25 @@ if st.session_state.page == "landing":
     if st.button("✨ Let me in!"):
         st.session_state.page = "main"
         st.rerun()
+
+    from bonus_summary import summarize_filing_from_url
+
+    st.markdown("---")
+    st.subheader("🎁 Bonus: Filing Summary from URL")
+    
+    with st.form("bonus_form"):
+        pdf_url_input = st.text_input("Paste the PDF URL here:")
+        bonus_magic_key = st.text_input("Enter Magic Key", type="password")
+        submit_summary = st.form_submit_button("Generate Summary")
+    
+    if submit_summary:
+        if bonus_magic_key == magic_key_actual:
+            with st.spinner("Processing summary..."):
+                summary_result = summarize_filing_from_url(pdf_url_input)
+            st.code(summary_result, language="json")
+        else:
+            st.error("❌ Incorrect Magic Key. Access denied.")
+    
     st.stop()
 
 # Main application UI
