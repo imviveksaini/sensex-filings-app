@@ -18,6 +18,12 @@ os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 #default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
 #os.makedirs(default_output_dir, exist_ok=True)
 
+tickers = [
+    {"name": "JUBLFOOD",        "bse_code": "543225"},
+    {"name": "KOTAKBANK",       "bse_code": "500247"},
+    {"name": "RIL",             "bse_code": "500325"}
+]
+
 def upload_to_github(filepath, repo, path_in_repo, branch="main_sensex"):
     token = st.secrets.get("GITHUB_TOKEN", os.getenv("OPENAI_API_KEY"))
     if not token:
@@ -86,11 +92,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
-    tickers = [
-    {"name": "JUBLFOOD",        "bse_code": "543225"},
-    {"name": "KOTAKBANK",       "bse_code": "500247"},
-    {"name": "RIL",             "bse_code": "500325"}
-]
+    
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
     HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
 
@@ -251,11 +253,11 @@ def load_filtered_data(start_date=None, end_date=None):
 
 
     dfs = []
-    for fname in os.listdir(default_output_dir):
-        if not fname.endswith('.csv'): continue
-        path = os.path.join(default_output_dir, fname)
+    for tk in tickers:
+        ticker_name = tk["name"]
+        url = f"{base_url}/{ticker_name}.csv"
         try:
-            df = pd.read_csv(path, parse_dates=['date'])
+            df = pd.read_csv(url, parse_dates=['date'])
             df = df.rename(columns={
                 'ticker':'ticker_name','code':'ticker_bse',
                 'date':'date_of_filing',
