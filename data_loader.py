@@ -146,13 +146,27 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             if not attach: continue
 
             pdf = None; pdf_url = None
-            for path in [f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
-                         f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"]:
+            for path in [
+                f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
+                f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"
+            ]:
+                if path in existing_urls:  # ✅ Skip if already processed
+                    if debug and log_callback:
+                        log_callback(f"⏩ Skipping already processed URL: {path}")
+                    pdf_url = None
+                    break  # skip rest of loop
+        
                 try:
                     tmp = requests.get(path, headers=HEADERS, timeout=10)
-                    tmp.raise_for_status(); pdf=tmp.content; pdf_url=path; break
-                except: pass
-            if not pdf: continue
+                    tmp.raise_for_status()
+                    pdf = tmp.content
+                    pdf_url = path
+                    break
+                except:
+                    continue
+        
+            if not pdf_url:  # either already processed or download failed
+                continue
 
             raw = item.get("DissemDT","")
             try: d = raw.split("T")[0]; date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
@@ -205,15 +219,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     log_callback(f"⚠️ JSON parse error: {e}")
                 continue
 
-            new_records.append({
-                'ticker': tk['name'],
-                'code': tk['bse_code'],
-                'date': date,
-                'summary_gpt': summary,
-                'sentiment_gpt': sentiment,
-                'category_gpt': category,
-                'url': pdf_url
-            })
 
         if new_records:
             write_header = not os.path.isfile(csv_path)
