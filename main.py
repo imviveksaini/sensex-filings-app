@@ -20,6 +20,8 @@ from shareholding_pattern import show_shareholding_pattern
 from bse_insider_trades import show_bse_insider_trades
 from nse_bulk_block_short import show_nse_bulk_block_short_deals
 
+magic_key_actual = st.secrets.get("MAGIC_KEY", os.getenv("MAGIC_KEY"))
+
 log_msgs = []
 
 def log(msg):
@@ -60,12 +62,22 @@ st.sidebar.header("Controls")
 days = st.sidebar.number_input("Days to look back", min_value=1, max_value=365, value=10)
 
 debug = True #st.sidebar.checkbox("Debug mode", value=False)
-
+# Input for magic key (passcode)
+magic_key_entered = st.sidebar.text_input("Enter Magic Key to Refresh", type="password")
 refresh = st.sidebar.button("🔄 Refresh Filings Data")
 
 # Status and progress placeholders
 status_ph = st.sidebar.empty()
 progress_ph = st.sidebar.progress(0)
+
+# Check magic key before triggering refresh
+refresh = False
+if refresh_button:
+    if magic_key_entered == magic_key_actual:
+        refresh = True
+        status_ph.success("✅ Magic key accepted. Refresh triggered.")
+    else:
+        status_ph.error("❌ Incorrect magic key. Refresh not allowed.")
 
 if refresh:
     start_time = time.time()
