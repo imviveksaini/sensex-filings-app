@@ -110,6 +110,7 @@ ticker_input = st.sidebar.selectbox("Enter ticker symbol:", ["ALL"] + all_ticker
 
 if ticker_input == "ALL":
     df = df_all
+    df = df.sort_values(by="date", ascending=False)
     st.success(f"Found {len(df)} filings across all tickers")
 
     # You can optionally show a unified table here too
