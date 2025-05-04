@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-def render_filing_table(matches, summary_option="summary_gpt", sentiment_option="sentiment_gpt", category_filter=None):
+def render_filing_table(matches, summary_option="summary_gpt", sentiment_option="sentiment_gpt"):
     """
     Renders a HTML table of filings allowing dynamic selection of summary and sentiment model.
     - matches: DataFrame with columns including:
@@ -20,19 +20,24 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
 
     # Convert ticker to HTML link
     df = matches.copy()
-
-    # Filter rows by category if a filter is provided
-    if category_filter:
-        df = df[df[category_col].str.contains(category_filter, case=False, na=False)]
-
-    # Convert ticker to HTML link
     df["ticker_name"] = df["ticker_name"].apply(
         lambda x: f'<a href="https://www.google.com/search?q={x}" target="_blank">{x}</a>'
     )
 
-    # Build table rows
+    # Get the unique categories for multi-select filter
+    unique_categories = df[category_col].dropna().unique()
+    
+    # Streamlit multi-select for category filter
+    selected_categories = st.multiselect(
+        "Filter by Category", options=unique_categories, default=unique_categories
+    )
+
+    # Filter rows based on selected categories
+    df_filtered = df[df[category_col].isin(selected_categories)]
+
+    # Build table rows for filtered data
     rows = []
-    for _, row in df.iterrows():
+    for _, row in df_filtered.iterrows():
         sentiment = row.get(sentiment_col, 0)
         color = 'green' if sentiment > 0 else 'red' if sentiment < 0 else 'black'
         summary = row.get(summary_col, "")
@@ -69,9 +74,3 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
     </table>
 </div>'''
     return html
-
-# Example usage in a Streamlit app
-category_filter = st.text_input("Filter by Category", "")  # Allow user to filter by category
-df = pd.DataFrame()  # Replace with your actual DataFrame
-html_table = render_filing_table(df, category_filter=category_filter)
-st.markdown(html_table, unsafe_allow_html=True)
