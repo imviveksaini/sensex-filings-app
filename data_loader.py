@@ -117,7 +117,7 @@ def call_gpt(raw_input_text: str) -> dict:
         Respond **only** in valid JSON format with exactly two keys:
         1. "summary": a brief summary of the filing in maximum two sentences.
         2. "sentiment": how bullish are you on its stock based on the information in the filing. 100= very bullish, -100= very bearish.
-        3. "category": summarise this news between 1-3 words only.
+        3. "category": summarise this news between 1-3 words only. If it looks like earnigns call transcript to you, write "earnings_call_transcript" as category.
         Filing text:
         {raw_input_text}
         '''
