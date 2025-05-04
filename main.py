@@ -58,7 +58,16 @@ st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 # Controls: update parameters
 st.sidebar.header("Controls")
 days = st.sidebar.number_input("Days to look back", min_value=1, max_value=365, value=10)
-debug = True #st.sidebar.checkbox("Debug mode", value=False)
+
+#debug = True #st.sidebar.checkbox("Debug mode", value=False)
+# Initialize session state for debug if not already set
+if 'debug' not in st.session_state:
+    st.session_state.debug = False
+# Update session state from checkbox
+st.session_state.debug = st.sidebar.checkbox("Debug mode", value=st.session_state.debug)
+# Access the value using session state
+debug = st.session_state.debug
+
 refresh = st.sidebar.button("🔄 Refresh Filings Data")
 
 # Status and progress placeholders
