@@ -220,7 +220,7 @@ def summarize_filing_from_url(url: str, doc_type: str = "general") -> tuple[str,
     if not text.strip():
         return None, "❌ No text could be extracted from the document."
 
-    text = text[:4000]  # truncate to stay within token limits
+    text = text[:40000]  # truncate to stay within token limits
 
     # Select GPT summarizer based on document type
     if doc_type == "earnings_call_transcript":
