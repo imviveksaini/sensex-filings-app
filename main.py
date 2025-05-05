@@ -62,7 +62,7 @@ if st.session_state.page == "landing":
         # New document type selection
         doc_type = st.selectbox(
             "Select document type:",
-            options=["general", "news_story", "earnings_call_transcript", "research_report"],
+            options=["general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"],
             index=0,
         )
         submit_summary = st.form_submit_button("Generate Summary")
@@ -70,7 +70,7 @@ if st.session_state.page == "landing":
     # Check if the form was submitted and key is valid
     if submit_summary and bonus_magic_key == magic_key_actual:
         with st.spinner("Processing summary..."):
-            summary_result, extracted_text = summarize_filing_from_url(pdf_url_input)
+            summary_result, extracted_text = summarize_filing_from_url(pdf_url_input, doc_type)
             # Save to session state
             st.session_state["summary_result"] = summary_result
             st.session_state["extracted_text"] = extracted_text
