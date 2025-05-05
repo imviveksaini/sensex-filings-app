@@ -70,6 +70,8 @@ tickers = [
     {"name": "JUBLFOOD",        "bse_code": "543225"},
     {"name": "KOTAKBANK",       "bse_code": "500247"},
     {"name": "RIL",             "bse_code": "500325"}
+    {"name": "VMM",             "bse_code": "544307"}
+    {"name": "ELECON",          "bse_code": "505700"}
 ]
 
 def upload_to_github(filepath, repo, path_in_repo, branch="main_sensex"):
@@ -115,9 +117,9 @@ def call_gpt(raw_input_text: str) -> dict:
         Understand the following filing and analyze it carefully.
         
         Respond **only** in valid JSON format with exactly two keys:
-        1. "summary": a brief summary of the filing in maximum two sentences.
+        1. "summary": a brief summary of the filing in maximum 3 lines, bullet points. First word should be either "Important." or "Not important.", depending upon how impactful the filing is for stock prices of this company.
         2. "sentiment": how bullish are you on its stock based on the information in the filing. 100= very bullish, -100= very bearish.
-        3. "category": Categoriese this news in a news category between 1-3 words only. But if it looks like the text contains earnings call transcript, write "earnings_call_transcript" as category.
+        3. "category": Categoriese this news in a news category between 1-3 words only. But if the filing text contains "audio recording" or "transcript" in the first 300 words of the text, write "earnings_call_transcript" as category.
         Filing text:
         {raw_input_text}
         '''
