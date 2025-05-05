@@ -50,7 +50,43 @@ if st.session_state.page == "landing":
     if st.button("✨ Let me in!"):
         st.session_state.page = "main"
         st.rerun()
-    st.stop()
+
+    from bonus_summary import summarize_filing_from_url
+
+    st.markdown("---")
+    st.subheader("🎁 Bonus: Filing Summary from URL")
+    
+    with st.form("bonus_form"):
+        pdf_url_input = st.text_input("Paste the PDF URL here:")
+        bonus_magic_key = st.text_input("Enter Magic Key", type="password")
+        # New document type selection
+        doc_type = st.selectbox(
+            "Select document type:",
+            options=["general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"],
+            index=0,
+        )
+        submit_summary = st.form_submit_button("Generate Summary")
+    
+    # Check if the form was submitted and key is valid
+    if submit_summary and bonus_magic_key == magic_key_actual:
+        with st.spinner("Processing summary..."):
+            summary_result, extracted_text = summarize_filing_from_url(pdf_url_input, doc_type)
+            # Save to session state
+            st.session_state["summary_result"] = summary_result
+            st.session_state["extracted_text"] = extracted_text
+    
+    # Display toggle if data exists
+    if "summary_result" in st.session_state and "extracted_text" in st.session_state:
+        show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary")
+    
+        if show_extracted_text:
+            st.code(st.session_state["extracted_text"], language="markdown")
+        else:
+            st.code(st.session_state["summary_result"], language="json")
+    elif submit_summary:
+        st.error("❌ Incorrect Magic Key. Access denied.")
+    
+ #   st.stop()
 
 # Main application UI
 # Theme selector
@@ -137,6 +173,7 @@ if ticker_input == "ALL":
 
 else:
     df = df_all[df_all["ticker_name"].str.upper() == ticker_input.upper()]
+    df = df.sort_values(by="date_of_filing", ascending=False)
     st.success(f"Found {len(df)} filings for {ticker_input}")
 
     # Tabs for different views
@@ -173,3 +210,33 @@ else:
         show_bse_insider_trades(ticker_input)
         st.subheader("💼 NSE Bulk/Block/Short Deals")
         show_nse_bulk_block_short_deals(ticker_input)
+
+
+# 👇 Place this AFTER the tab5 section
+if st.session_state.get("scroll_to_summary_form"):
+    from bonus_summary import summarize_filing_from_url  # Import again if needed
+
+    st.markdown("---")
+    st.subheader("📄 Detailed Filing Summary Form")
+
+    with st.form("summary_form_from_table"):
+        pdf_url_input = st.text_input("PDF URL", value=st.session_state.get("summary_url_from_table", ""))
+        doc_type = st.selectbox(
+            "Select document type:",
+            options=["general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"],
+            index=0,
+        )
+        magic_key_input = st.text_input("Magic Key", type="password")
+        submit_summary = st.form_submit_button("Generate Summary")
+
+    if submit_summary and magic_key_input == magic_key_actual:
+        with st.spinner("Generating summary..."):
+            summary_result, extracted_text = summarize_filing_from_url(pdf_url_input, doc_type)
+            st.session_state["summary_result"] = summary_result
+            st.session_state["extracted_text"] = extracted_text
+            st.session_state["scroll_to_summary_form"] = False  # Reset scroll flag
+            st.rerun()
+    elif submit_summary:
+        st.error("❌ Incorrect Magic Key")
+
+st.stop()
