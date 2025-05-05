@@ -69,8 +69,8 @@ tickers = [
     {"name": "HINDUNILVR",      "bse_code": "500696"},
     {"name": "JUBLFOOD",        "bse_code": "543225"},
     {"name": "KOTAKBANK",       "bse_code": "500247"},
-    {"name": "RIL",             "bse_code": "500325"}
-    {"name": "VMM",             "bse_code": "544307"}
+    {"name": "RIL",             "bse_code": "500325"},
+    {"name": "VMM",             "bse_code": "544307"},
     {"name": "ELECON",          "bse_code": "505700"}
 ]
 
