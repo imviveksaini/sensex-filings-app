@@ -64,8 +64,15 @@ if st.session_state.page == "landing":
     if submit_summary:
         if bonus_magic_key == magic_key_actual:
             with st.spinner("Processing summary..."):
-                summary_result = summarize_filing_from_url(pdf_url_input)
-            st.code(summary_result, language="json")
+                summary_result, extracted_text = summarize_filing_from_url(pdf_url_input)
+    
+            # Toggle switch
+            show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary")
+    
+            if show_extracted_text:
+                st.code(extracted_text, language="markdown")
+            else:
+                st.code(summary_result, language="json")
         else:
             st.error("❌ Incorrect Magic Key. Access denied.")
     
