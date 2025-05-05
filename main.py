@@ -59,6 +59,12 @@ if st.session_state.page == "landing":
     with st.form("bonus_form"):
         pdf_url_input = st.text_input("Paste the PDF URL here:")
         bonus_magic_key = st.text_input("Enter Magic Key", type="password")
+        # New document type selection
+        doc_type = st.selectbox(
+            "Select document type:",
+            options=["general", "news_story", "earnings_call_transcript", "research_report"],
+            index=0,
+        )
         submit_summary = st.form_submit_button("Generate Summary")
     
     # Check if the form was submitted and key is valid
