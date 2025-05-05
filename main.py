@@ -6,7 +6,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 
-from data_loader import update_filings_data, load_filtered_data
+from data_loader import update_filings_data
 from filing_table import render_filing_table
 from sentiment_chart import plot_sentiment_chart
 from price_chart import plot_stock_price
@@ -26,11 +26,16 @@ def log(msg):
 
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
 
+# Page State
 if "page" not in st.session_state:
     st.session_state.page = "landing"
 
+# Theme Selection
+theme = st.sidebar.radio("🌗 Select Theme", ("Light", "Dark"))
+st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
+
+# Landing Page
 if st.session_state.page == "landing":
-    st.markdown(apply_custom_styles("Light"), unsafe_allow_html=True)
     st.markdown("""
         <h1 style='text-align:center;'>📊 Welcome to Your Filing Superpower</h1>
         <p style='text-align:center;'>Behind every stock movement lies a story...the story begins with filings & earnings calls.</p>
@@ -69,9 +74,7 @@ if st.session_state.page == "landing":
         else:
             st.code(st.session_state["summary_result"], language="json")
 
-# Apply theme
-theme = st.sidebar.radio("🌗 Select Theme", ("Light", "Dark"))
-st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
+    st.stop()
 
 # Sidebar controls
 st.sidebar.header("Controls")
@@ -95,10 +98,18 @@ if refresh:
     start_time = time.time()
     def status(msg): status_ph.text(msg)
     def progress(p): progress_ph.progress(p)
+    from data_loader import load_filtered_data as raw_loader  # use uncached version to refresh
     new_count = update_filings_data(days=days, debug=debug, status_callback=status, progress_callback=progress, log_callback=log)
     elapsed = time.time() - start_time
     status_ph.text(f"Completed in {elapsed:.1f}s — {new_count} new filings added.")
     progress_ph.empty()
+else:
+    from streamlit.runtime.caching import cache_data
+
+    @st.cache_data(show_spinner=False)
+    def load_filtered_data(start_date, end_date):
+        from data_loader import load_filtered_data as actual_loader
+        return actual_loader(start_date, end_date)
 
 if debug and log_msgs:
     st.subheader("🛠️ Debug Logs")
@@ -115,6 +126,7 @@ df_all = load_filtered_data(start_date, end_date)
 all_tickers = sorted(df_all["ticker_name"].dropna().unique()) if not df_all.empty else []
 ticker_input = st.sidebar.selectbox("Enter ticker symbol:", ["ALL"] + all_tickers)
 
+# Ticker-specific or all
 if ticker_input == "ALL":
     df = df_all.sort_values(by="date_of_filing", ascending=False)
     st.success(f"Found {len(df)} filings across all tickers")
@@ -151,7 +163,7 @@ else:
         st.subheader("💼 NSE Bulk/Block/Short Deals")
         show_nse_bulk_block_short_deals(ticker_input)
 
-# 🚀 Summary Form - always at bottom
+# 🚀 Detailed Summary Form — always at bottom
 st.markdown('<div id="summary_form_scroll"></div>', unsafe_allow_html=True)
 st.markdown("---")
 st.subheader("📄 Detailed Filing Summary Form")
@@ -182,9 +194,9 @@ if st.session_state.get("summary_result"):
     else:
         st.code(st.session_state["summary_result"], language="json")
 
-# 🔽 Scroll to form if triggered
+# 🔽 Auto-scroll to summary form
 if st.session_state.get("scroll_to_summary_form"):
-    st.session_state["scroll_to_summary_form"] = False  # reset flag
+    st.session_state["scroll_to_summary_form"] = False
     st.markdown("""
         <script>
         const el = document.getElementById("summary_form_scroll");
