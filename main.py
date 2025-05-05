@@ -86,7 +86,7 @@ if st.session_state.page == "landing":
     elif submit_summary:
         st.error("❌ Incorrect Magic Key. Access denied.")
     
-    st.stop()
+ #   st.stop()
 
 # Main application UI
 # Theme selector
@@ -238,3 +238,5 @@ if st.session_state.get("scroll_to_summary_form"):
             st.rerun()
     elif submit_summary:
         st.error("❌ Incorrect Magic Key")
+
+st.stop()
