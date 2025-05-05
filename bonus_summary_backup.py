@@ -76,10 +76,10 @@ Filing text:
         print(f"GPT API call failed: {e}")
         return None
 
-def summarize_filing_from_url(url: str) -> str | None:
+def summarize_filing_from_url(url: str) -> tuple[str, str] | None:
     content_type, content = download_url(url)
     if not content:
-        return "❌ Failed to download content."
+        return None, "❌ Failed to download content."
 
     # Determine parser
     if url.lower().endswith(".pdf") or "application/pdf" in content_type:
@@ -87,14 +87,14 @@ def summarize_filing_from_url(url: str) -> str | None:
     elif "text/html" in content_type or url.lower().endswith(".html"):
         text = extract_text_from_html(content)
     else:
-        return "❌ Unsupported file format or could not determine file type."
+        return None, "❌ Unsupported file format or could not determine file type."
 
     if not text.strip():
-        return "❌ No text could be extracted from the document."
+        return None, "❌ No text could be extracted from the document."
 
     text = text[:4000]  # truncate to stay within token limits
     gpt_response = call_gpt_for_summary(text)
     if not gpt_response:
-        return "❌ Failed to get GPT summary."
+        return None, "❌ Failed to get GPT summary."
 
-    return gpt_response
+    return gpt_response, text
