@@ -55,7 +55,7 @@ Respond **only** in valid JSON format with exactly the following keys:
 1. "date": extract the date on which the text has been reported, in yyyy-mm-dd format.
 2. "event": Write which key event is being talked about in 1-4 words.
 3. "relevance": Carefully analyse and tell me if the information is material for stock prices. Just write "important" or "not important".
-4. "filing_summary": a brief summary of the financial information in the text. Maximum 3 lines, bullet points.
+4. "filing_summary": a brief summary of the financial information in the text. Maximum 6 lines, bullet points.
 5. "bullishness_indicator (-100 to 100)": how bullish are you on its stock based on the information in the text. 100 = very bullish, -100 = very bearish.
 
 
