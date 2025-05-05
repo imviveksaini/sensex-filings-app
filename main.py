@@ -210,3 +210,31 @@ else:
         show_bse_insider_trades(ticker_input)
         st.subheader("💼 NSE Bulk/Block/Short Deals")
         show_nse_bulk_block_short_deals(ticker_input)
+
+
+# 👇 Place this AFTER the tab5 section
+if st.session_state.get("scroll_to_summary_form"):
+    from bonus_summary import summarize_filing_from_url  # Import again if needed
+
+    st.markdown("---")
+    st.subheader("📄 Detailed Filing Summary Form")
+
+    with st.form("summary_form_from_table"):
+        pdf_url_input = st.text_input("PDF URL", value=st.session_state.get("summary_url_from_table", ""))
+        doc_type = st.selectbox(
+            "Select document type:",
+            options=["general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"],
+            index=0,
+        )
+        magic_key_input = st.text_input("Magic Key", type="password")
+        submit_summary = st.form_submit_button("Generate Summary")
+
+    if submit_summary and magic_key_input == magic_key_actual:
+        with st.spinner("Generating summary..."):
+            summary_result, extracted_text = summarize_filing_from_url(pdf_url_input, doc_type)
+            st.session_state["summary_result"] = summary_result
+            st.session_state["extracted_text"] = extracted_text
+            st.session_state["scroll_to_summary_form"] = False  # Reset scroll flag
+            st.rerun()
+    elif submit_summary:
+        st.error("❌ Incorrect Magic Key")
