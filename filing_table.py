@@ -47,4 +47,4 @@ def render_filing_table(matches, summary_option="summary_gpt", sentiment_option=
             if st.button("Generate Detailed Summary", key=f"gen_summary_{idx}"):
                 st.session_state["summary_url_from_table"] = pdf_url
                 st.session_state["scroll_to_summary_form"] = True  # Optional extra flag
-                st.experimental_rerun()
+                st.rerun()
