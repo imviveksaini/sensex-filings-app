@@ -156,6 +156,7 @@ if ticker_input == "ALL":
 
 else:
     df = df_all[df_all["ticker_name"].str.upper() == ticker_input.upper()]
+    df = df.sort_values(by="date_of_filing", ascending=False)
     st.success(f"Found {len(df)} filings for {ticker_input}")
 
     # Tabs for different views
