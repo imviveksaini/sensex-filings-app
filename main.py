@@ -106,9 +106,16 @@ if refresh:
 else:
     from streamlit.runtime.caching import cache_data
 
+    # @st.cache_data(show_spinner=False)
+    # def load_filtered_data(start_date, end_date):
+    #     from data_loader import load_filtered_data as actual_loader
+    #     return actual_loader(start_date, end_date)
+
+    # At the top of main.py
+    from data_loader import load_filtered_data as actual_loader
+    
     @st.cache_data(show_spinner=False)
-    def load_filtered_data(start_date, end_date):
-        from data_loader import load_filtered_data as actual_loader
+    def cached_load_filtered_data(start_date, end_date):
         return actual_loader(start_date, end_date)
 
 if debug and log_msgs:
