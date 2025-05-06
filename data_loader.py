@@ -138,7 +138,7 @@ def call_gpt(raw_input_text: str) -> dict:
         return None
 
 
-def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
+def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     # Configuration
     SCRIP_CODE = "533282"  # Gravita Industries BSE code
 
@@ -223,7 +223,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                         log_callback(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
 
 
-def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
