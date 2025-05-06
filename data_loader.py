@@ -169,7 +169,19 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     while True:
         resp = requests.get("https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w", 
                             params=params, headers=headers)
-        data = resp.json()
+        
+        if resp.status_code != 200:
+            if debug and log_callback:
+                log_callback(f"HTTP error: {resp.status_code} for SCRIP {SCRIP_CODE}")
+            break
+        
+        try:
+            data = resp.json()
+        except ValueError:
+            if debug and log_callback:
+                log_callback(f"Non-JSON response for SCRIP {SCRIP_CODE}: {resp.text[:200]}")
+            break
+        
         # Stop if no data or on error
         if "Table" not in data or not data["Table"]:
             break
