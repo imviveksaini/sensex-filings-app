@@ -202,9 +202,9 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             if file_resp.status_code == 200:
                 with open(file_path, "wb") as f:
                     #f.write(file_resp.content)
-                #print(f"Downloaded: {title[:50]}... -> {file_path}")
-                if debug and log_callback:
-                        log_callback(f"Downloaded: {title[:50]}... -> {file_path}")
+                    #print(f"Downloaded: {title[:50]}... -> {file_path}")
+                    if debug and log_callback:
+                            log_callback(f"Downloaded: {title[:50]}... -> {file_path}")
             else:
                 #print(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
                 if debug and log_callback:
