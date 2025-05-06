@@ -143,6 +143,8 @@ def call_gpt(raw_input_text: str) -> dict:
 
 
 
+
+
 def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
@@ -312,6 +314,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
+
 
 
 
