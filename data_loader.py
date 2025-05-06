@@ -10,6 +10,11 @@ from openai import OpenAI
 import streamlit as st
 import json
 import base64
+from bs4 import BeautifulSoup
+from urllib.parse import urlencode
+
+
+
 
 
 from requests.adapters import HTTPAdapter, Retry
@@ -145,29 +150,22 @@ def call_gpt(raw_input_text: str) -> dict:
 
 
 
+
+
+
 def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
-    Scrape and GPT process filings; append only new filings to existing ticker CSVs.
+    Scrape BSE filings using BeautifulSoup (fallback for disabled API); append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
 
-    BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
-    HEADERS = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Referer": "https://www.bseindia.com/",
-        "X-Requested-With": "XMLHttpRequest",
-        "Origin": "https://www.bseindia.com"
-    }
+    BASE_URL = "https://www.bseindia.com/corporates/ann.aspx"
+    HEADERS = {"User-Agent": "Mozilla/5.0"}
 
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
-    prev = start.strftime("%Y%m%d")
-    to = end.strftime("%Y%m%d")
+    prev = start.strftime("%d/%m/%Y")
+    to = end.strftime("%d/%m/%Y")
 
     total_new = 0
     n = len(tickers)
@@ -175,8 +173,10 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         log_callback(f"{n} tickers to process from {start} to {end}")
 
     for i, tk in enumerate(tickers, 1):
-        if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
-        if progress_callback: progress_callback((i-1)/n)
+        if status_callback:
+            status_callback(f"Processing {tk['name']} ({i}/{n})")
+        if progress_callback:
+            progress_callback((i - 1) / n)
 
         csv_path = f"data/portfolio_stocks_gpt/{tk['name']}.csv"
         existing_urls = set()
@@ -187,65 +187,55 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             except Exception:
                 pass
 
-        payload = {
-            "pageno": 1,
-            "strCat": "-1",
-            "strPrevDate": prev,
-            "strScrip": tk['bse_code'],
-            "strSearch": "P",
-            "strToDate": to,
-            "strType": "C",
-            "subcategory": ""
+        params = {
+            'expandable': '0',
+            'scripcode': tk['bse_code'],
+            'category': '0',
+            'fromdate': prev,
+            'todate': to,
+            'submit': 'Search'
         }
 
-        ann = []
-        while True:
-            try:
-                r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=15)
-                r.raise_for_status()
-                data = r.json().get("Table", [])
-                if not data: break
-                ann.extend(data)
-                payload["pageno"] += 1
-                time.sleep(1)  # Delay between page fetches
-            except Exception as e:
-                if debug and log_callback:
-                    log_callback(f"⚠️ Fetch error {tk['name']} ({tk['bse_code']}): {e}")
-                break
+        try:
+            response = requests.get(BASE_URL, headers=HEADERS, params=params, timeout=15)
+            response.raise_for_status()
+        except Exception as e:
+            if debug and log_callback:
+                log_callback(f"Fetch error {tk['name']}: {e}")
+            continue
 
-        if debug and log_callback:
-            log_callback(f"{tk['name']}: {len(ann)} announcements")
+        soup = BeautifulSoup(response.text, 'html.parser')
+        table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_gvData'})
+        if not table:
+            if debug and log_callback:
+                log_callback(f"No filings found for {tk['name']}")
+            continue
 
+        rows = table.find_all('tr')[1:]  # skip header row
         new_records = []
-        for item in ann:
-            attach = item.get("ATTACHMENTNAME", "").strip()
-            if not attach: continue
 
-            pdf = None; pdf_url = None
-            for path in [
-                f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
-                f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"
-            ]:
-                if path in existing_urls:
-                    continue
-                try:
-                    tmp = requests.get(path, headers=HEADERS, timeout=10)
-                    tmp.raise_for_status()
-                    pdf = tmp.content
-                    pdf_url = path
-                    break
-                except:
-                    continue
-
-            if not pdf_url:
+        for row in rows:
+            cols = row.find_all('td')
+            if len(cols) < 5:
                 continue
 
-            raw = item.get("DissemDT", "")
+            date = cols[0].text.strip()
+            desc = cols[1].text.strip()
+            link = cols[-1].find('a')
+            if not link:
+                continue
+
+            href = link.get('href')
+            pdf_url = f"https://www.bseindia.com{href}" if href.startswith("/") else href
+            if pdf_url in existing_urls:
+                continue
+
             try:
-                d = raw.split("T")[0]
-                date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
+                r = requests.get(pdf_url, headers=HEADERS, timeout=10)
+                r.raise_for_status()
+                pdf = r.content
             except:
-                date = datetime.today().strftime("%Y-%m-%d")
+                continue
 
             text = ""
             try:
@@ -257,7 +247,8 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     log_callback(f"Extract error: {e}")
                 continue
 
-            if not text.strip(): continue
+            if not text.strip():
+                continue
 
             input_text = text[:4000]
             raw_input_text = f"Text:\n{input_text}"
@@ -286,17 +277,19 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     'category_gpt': category,
                     'url': pdf_url
                 })
-
             except (ValueError, json.JSONDecodeError) as e:
                 if debug and log_callback:
                     log_callback(f"⚠️ JSON parse error: {e}")
                 continue
 
+            time.sleep(1)  # polite delay
+
         if new_records:
             write_header = not os.path.isfile(csv_path)
             with open(csv_path, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=new_records[0].keys())
-                if write_header: writer.writeheader()
+                if write_header:
+                    writer.writeheader()
                 writer.writerows(new_records)
             total_new += len(new_records)
 
@@ -311,10 +304,11 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 if debug and log_callback:
                     log_callback(f"GitHub upload failed for {tk['name']}: {e}")
 
-    if progress_callback: progress_callback(1.0)
-    if status_callback: status_callback(f"Done: {total_new} new filings.")
+    if progress_callback:
+        progress_callback(1.0)
+    if status_callback:
+        status_callback(f"Done: {total_new} new filings.")
     return total_new
-
 
 
 
