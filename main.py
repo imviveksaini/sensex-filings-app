@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from data_loader import update_filings_data
+from data_loader import load_filtered_data
 from filing_table import render_filing_table
 from sentiment_chart import plot_sentiment_chart
 from price_chart import plot_stock_price
