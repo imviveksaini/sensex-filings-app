@@ -144,7 +144,11 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     """
     
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
-    HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+    #HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+    HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/115.0 Safari/537.36",
+    "Referer": "https://www.bseindia.com/"
+}
 
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
