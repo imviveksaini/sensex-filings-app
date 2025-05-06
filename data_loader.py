@@ -258,56 +258,47 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 continue
 
             try:
-                parsed = json.loads(gpt_response)
-                summary = parsed.get('summary', '')
-                sentiment = parsed.get('sentiment', '')
-                category = parsed.get('category', '')
-
+                gpt_data = json.loads(gpt_response)
+                summary = gpt_data.get("summary", "")
+                sentiment = gpt_data.get("sentiment", "")
+                category = gpt_data.get("category", "")
+            except Exception as e:
                 if debug and log_callback:
-                    log_callback(f"📝 Summary GPT: {summary}")
-                    log_callback(f"📈 Sentiment GPT: {sentiment}")
-                    log_callback(f"🏷️ Category GPT: {category}")
-
-                new_records.append({
-                    'ticker': tk['name'],
-                    'code': tk['bse_code'],
-                    'date': date,
-                    'summary_gpt': summary,
-                    'sentiment_gpt': sentiment,
-                    'category_gpt': category,
-                    'url': pdf_url
-                })
-            except (ValueError, json.JSONDecodeError) as e:
-                if debug and log_callback:
-                    log_callback(f"⚠️ JSON parse error: {e}")
+                    log_callback(f"GPT parsing error: {e}")
                 continue
 
-            time.sleep(1)  # polite delay
+            new_records.append({
+                "date": date,
+                "description": desc,
+                "url": pdf_url,
+                "summary_gpt": summary,
+                "sentiment_gpt": sentiment,
+                "category_gpt": category,
+                "input_gpt": input_text.replace("\n", " ")[:2000]
+            })
 
         if new_records:
-            write_header = not os.path.isfile(csv_path)
-            with open(csv_path, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=new_records[0].keys())
-                if write_header:
-                    writer.writeheader()
-                writer.writerows(new_records)
+            df_new = pd.DataFrame(new_records)
+            if os.path.exists(csv_path):
+                df_exist = pd.read_csv(csv_path)
+                df_combined = pd.concat([df_exist, df_new], ignore_index=True).drop_duplicates(subset=["url"])
+            else:
+                df_combined = df_new
+
+            df_combined.to_csv(csv_path, index=False)
             total_new += len(new_records)
 
             try:
-                upload_to_github(
-                    filepath=csv_path,
-                    repo="imviveksaini/sensex-filings-app",
-                    path_in_repo=f"data/portfolio_stocks_gpt/{tk['name']}.csv",
-                    branch="main_sensex"
-                )
+                upload_to_github(csv_path, repo="your_github_user/your_repo", path_in_repo=f"data/portfolio_stocks_gpt/{tk['name']}.csv")
             except Exception as e:
                 if debug and log_callback:
                     log_callback(f"GitHub upload failed for {tk['name']}: {e}")
+                continue
 
     if progress_callback:
         progress_callback(1.0)
     if status_callback:
-        status_callback(f"Done: {total_new} new filings.")
+        status_callback(f"Done. {total_new} new records added.")
     return total_new
 
 
