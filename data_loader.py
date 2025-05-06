@@ -11,6 +11,10 @@ import streamlit as st
 import json
 import base64
 
+
+from requests.adapters import HTTPAdapter, Retry
+from time import sleep
+
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
 
@@ -142,9 +146,19 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
-    
+
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
-    HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Referer": "https://www.bseindia.com/",
+        "Accept": "application/json",
+        "Origin": "https://www.bseindia.com"
+    }
+
+    # Retry-capable session
+    session = requests.Session()
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
 
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
@@ -155,13 +169,11 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     n = len(tickers)
     if debug and log_callback:
         log_callback(f"{n} tickers to process from {start} to {end}")
-    #print(n, start, end)
 
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
 
-        #csv_path = os.path.join(default_output_dir, f"{tk['name']}.csv")
         csv_path = f"data/portfolio_stocks_gpt/{tk['name']}.csv"
         existing_urls = set()
         if os.path.isfile(csv_path):
@@ -171,89 +183,110 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             except Exception:
                 pass
 
-        payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
-                   "strScrip":tk['bse_code'],"strSearch":"P",
-                   "strToDate":to,"strType":"C","subcategory":""}
+        payload = {
+            "pageno": 1,
+            "strCat": "-1",
+            "strPrevDate": prev,
+            "strScrip": tk['bse_code'],
+            "strSearch": "P",
+            "strToDate": to,
+            "strType": "C",
+            "subcategory": ""
+        }
+
         ann = []
         while True:
             try:
-                r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
+                r = session.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
                 r.raise_for_status()
+            except requests.exceptions.HTTPError as http_err:
+                if debug and log_callback:
+                    log_callback(f"⚠️ HTTP error for {tk['name']}: {http_err}")
+                if r.status_code == 403:
+                    sleep(2)  # brief delay before skipping
+                break
             except Exception as e:
                 if debug and log_callback:
-                    log_callback(f"Fetch error {tk['name']}: {e}")
+                    log_callback(f"❌ Fetch error {tk['name']}: {e}")
                 break
             data = r.json().get("Table", [])
-            if not data: break
+            if not data:
+                break
             ann.extend(data)
             payload["pageno"] += 1
+            sleep(0.5)  # polite delay
+
         if debug and log_callback:
             log_callback(f"{tk['name']}: {len(ann)} announcements")
 
         new_records = []
         for item in ann:
-            attach = item.get("ATTACHMENTNAME","").strip()
-            if not attach: continue
+            attach = item.get("ATTACHMENTNAME", "").strip()
+            if not attach:
+                continue
 
-            pdf = None; pdf_url = None
+            pdf = None
+            pdf_url = None
             for path in [
                 f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
                 f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"
             ]:
-                if path in existing_urls:  # ✅ Skip if already processed
+                if path in existing_urls:
                     if debug and log_callback:
                         log_callback(f"⏩ Skipping already processed URL: {path}")
                     pdf_url = None
-                    break  # skip rest of loop
-        
+                    break
+
                 try:
-                    tmp = requests.get(path, headers=HEADERS, timeout=10)
+                    tmp = session.get(path, headers=HEADERS, timeout=10)
                     tmp.raise_for_status()
                     pdf = tmp.content
                     pdf_url = path
                     break
                 except:
                     continue
-        
-            if not pdf_url:  # either already processed or download failed
+
+            if not pdf_url:
                 continue
 
-            raw = item.get("DissemDT","")
-            try: d = raw.split("T")[0]; date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
-            except: date = datetime.today().strftime("%Y-%m-%d")
+            raw = item.get("DissemDT", "")
+            try:
+                d = raw.split("T")[0]
+                date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
+            except:
+                date = datetime.today().strftime("%Y-%m-%d")
 
             text = ""
             try:
                 for p in PdfReader(BytesIO(pdf)).pages:
-                    t = p.extract_text() or ""; text += t + "\n"
+                    t = p.extract_text() or ""
+                    text += t + "\n"
             except Exception as e:
                 if debug and log_callback:
-                    log_callback(f"Extract error: {e}")
+                    log_callback(f"📄 Extract error: {e}")
                 continue
-            if not text.strip(): continue
+
+            if not text.strip():
+                continue
 
             input_text = text[:4000]
             raw_input_text = f"Text:\n{input_text}"
             gpt_response = call_gpt(raw_input_text)
-            #if debug and log_callback:
-            #    log_callback(f"Input: {raw_input_text}\nGPT raw: {gpt_response}")
-            
+
             if not gpt_response:
                 continue
-            
+
             try:
-                # Parse the JSON string from GPT
                 parsed = json.loads(gpt_response)
-            
                 summary = parsed.get('summary', '')
                 sentiment = parsed.get('sentiment', '')
                 category = parsed.get('category', '')
-            
+
                 if debug and log_callback:
                     log_callback(f"📝 Summary GPT: {summary}")
                     log_callback(f"📈 Sentiment GPT: {sentiment}")
                     log_callback(f"🏷️ Category GPT: {category}")
-            
+
                 new_records.append({
                     'ticker': tk['name'],
                     'code': tk['bse_code'],
@@ -263,22 +296,21 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     'category_gpt': category,
                     'url': pdf_url
                 })
-            
+
             except (ValueError, json.JSONDecodeError) as e:
                 if debug and log_callback:
                     log_callback(f"⚠️ JSON parse error: {e}")
                 continue
 
-
         if new_records:
             write_header = not os.path.isfile(csv_path)
             with open(csv_path, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=new_records[0].keys())
-                if write_header: writer.writeheader()
+                if write_header:
+                    writer.writeheader()
                 writer.writerows(new_records)
             total_new += len(new_records)
 
-            # ✅ Upload to GitHub
             try:
                 upload_to_github(
                     filepath=csv_path,
