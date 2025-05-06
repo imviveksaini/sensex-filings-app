@@ -141,6 +141,8 @@ def call_gpt(raw_input_text: str) -> dict:
         print(f"GPT API call failed: {e}")
         return None
 
+
+
 def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
@@ -149,16 +151,16 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
 
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
     HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/javascript, */*; q=0.01",
         "Referer": "https://www.bseindia.com/",
-        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
         "Origin": "https://www.bseindia.com"
     }
-
-    # Retry-capable session
-    session = requests.Session()
-    retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503, 504])
-    session.mount("https://", HTTPAdapter(max_retries=retries))
 
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
@@ -197,24 +199,17 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         ann = []
         while True:
             try:
-                r = session.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
+                r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=15)
                 r.raise_for_status()
-            except requests.exceptions.HTTPError as http_err:
-                if debug and log_callback:
-                    log_callback(f"⚠️ HTTP error for {tk['name']}: {http_err}")
-                if r.status_code == 403:
-                    sleep(2)  # brief delay before skipping
-                break
+                data = r.json().get("Table", [])
+                if not data: break
+                ann.extend(data)
+                payload["pageno"] += 1
+                time.sleep(1)  # Delay between page fetches
             except Exception as e:
                 if debug and log_callback:
-                    log_callback(f"❌ Fetch error {tk['name']}: {e}")
+                    log_callback(f"⚠️ Fetch error {tk['name']} ({tk['bse_code']}): {e}")
                 break
-            data = r.json().get("Table", [])
-            if not data:
-                break
-            ann.extend(data)
-            payload["pageno"] += 1
-            sleep(0.5)  # polite delay
 
         if debug and log_callback:
             log_callback(f"{tk['name']}: {len(ann)} announcements")
@@ -222,23 +217,17 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         new_records = []
         for item in ann:
             attach = item.get("ATTACHMENTNAME", "").strip()
-            if not attach:
-                continue
+            if not attach: continue
 
-            pdf = None
-            pdf_url = None
+            pdf = None; pdf_url = None
             for path in [
                 f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
                 f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"
             ]:
                 if path in existing_urls:
-                    if debug and log_callback:
-                        log_callback(f"⏩ Skipping already processed URL: {path}")
-                    pdf_url = None
-                    break
-
+                    continue
                 try:
-                    tmp = session.get(path, headers=HEADERS, timeout=10)
+                    tmp = requests.get(path, headers=HEADERS, timeout=10)
                     tmp.raise_for_status()
                     pdf = tmp.content
                     pdf_url = path
@@ -263,11 +252,10 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     text += t + "\n"
             except Exception as e:
                 if debug and log_callback:
-                    log_callback(f"📄 Extract error: {e}")
+                    log_callback(f"Extract error: {e}")
                 continue
 
-            if not text.strip():
-                continue
+            if not text.strip(): continue
 
             input_text = text[:4000]
             raw_input_text = f"Text:\n{input_text}"
@@ -306,8 +294,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             write_header = not os.path.isfile(csv_path)
             with open(csv_path, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=new_records[0].keys())
-                if write_header:
-                    writer.writeheader()
+                if write_header: writer.writeheader()
                 writer.writerows(new_records)
             total_new += len(new_records)
 
@@ -325,6 +312,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
+
 
 
 def load_filtered_data(start_date=None, end_date=None):
