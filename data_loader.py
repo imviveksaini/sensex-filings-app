@@ -137,7 +137,81 @@ def call_gpt(raw_input_text: str) -> dict:
         print(f"GPT API call failed: {e}")
         return None
 
+
 def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
+    # Configuration
+    SCRIP_CODE = "533282"  # Gravita Industries BSE code
+
+    
+    # Date range: last 30 days
+    end_date = datetime.today()
+    start_date = end_date - timedelta(days=30)
+    date_fmt = "%Y%m%d"
+    params = {
+        "pageno": 1,
+        "strPrevDate": start_date.strftime(date_fmt),
+        "strToDate": end_date.strftime(date_fmt),
+        "strScrip": SCRIP_CODE,
+        "strType": "C",      # corporate announcements
+        "strCat": "-1",      # all categories
+        "strSearch": "P",    # public announcements
+        "subcategory": ""    # all subcategories
+    }
+    # headers = {
+    #     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/115.0 Safari/537.36",
+    #     "Referer": "https://www.bseindia.com/"
+    # }
+    headers = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+    
+    announcements = []  # to collect announcements
+    
+    # Loop through pages until no more data
+    while True:
+        resp = requests.get("https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w", 
+                            params=params, headers=headers)
+        data = resp.json()
+        # Stop if no data or on error
+        if "Table" not in data or not data["Table"]:
+            break
+        announcements.extend(data["Table"])
+        params["pageno"] += 1  # next page
+    
+    # Logging: print sample announcement for inspection
+    if announcements:
+        print("Sample Announcement:")
+        print(announcements[0])
+    
+    # Process each announcement to download attachment if available
+    for ann in announcements:
+        title = ann.get("HEADLINE") or ann.get("NEWSSUB")
+        datetime_str = ann.get("DissemDT", "")
+        date_part = datetime_str.split("T")[0] if "T" in datetime_str else datetime_str
+        
+        # Build the attachment URL if a PDF is present
+        attachment_name = ann.get("ATTACHMENTNAME")
+        if attachment_name:
+            file_url = f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attachment_name}"
+            file_path = os.path.join(OUTPUT_DIR, attachment_name)
+            
+            # Log attachment name and URL for verification
+            #print(f"Attachment: {attachment_name} -> URL: {file_url}")
+            if debug and log_callback:
+                        log_callback(f"Attachment: {attachment_name} -> URL: {file_url}")
+            
+            file_resp = requests.get(file_url, headers=headers)
+            if file_resp.status_code == 200:
+                with open(file_path, "wb") as f:
+                    #f.write(file_resp.content)
+                #print(f"Downloaded: {title[:50]}... -> {file_path}")
+                if debug and log_callback:
+                        log_callback(f"Downloaded: {title[:50]}... -> {file_path}")
+            else:
+                #print(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
+                if debug and log_callback:
+                        log_callback(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
+
+
+def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
