@@ -38,9 +38,8 @@ st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 # Landing Page
 if st.session_state.page == "landing":
     st.markdown("""
-        <h1 style='text-align:center;'>📊 Welcome to Your Filing Superpower</h1>
-        <p style='text-align:center;'>Behind every stock movement lies a story...the story begins with filings & earnings calls.</p>
-        <p style='text-align:center;'>Whether you're a casual investor or a spreadsheet ninja — this app helps you decode the fine print.</p>
+        <h1 style='text-align:center;'>📊 Precision Research-- Built on Raw Disclosures</h1>
+        <p style='text-align:center;'>Automated parsing and synthesis of the documents that matter most.</p>
     """, unsafe_allow_html=True)
 
     if st.button("✨ Let me in!"):
@@ -50,7 +49,7 @@ if st.session_state.page == "landing":
     st.markdown("---")
     st.subheader("🎁 Bonus: Filing Summary from URL")
     with st.form("bonus_form"):
-        pdf_url_input = st.text_input("Paste the PDF URL here:")
+        pdf_url_input = st.text_input("Paste the PDF/html URL here:")
         bonus_magic_key = st.text_input("Enter Magic Key", type="password")
         doc_type = st.selectbox("Select document type:", options=[
             "general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"
