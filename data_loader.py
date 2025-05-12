@@ -10,6 +10,7 @@ from openai import OpenAI
 import streamlit as st
 import json
 import base64
+import time
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
