@@ -254,11 +254,38 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         from zenrows import ZenRowsClient
         zenrows_client = ZenRowsClient(zenrows_api_key)
 
+    # Initialize session for persistent cookies
+    session = requests.Session()
+    session.headers.update(HEADERS)
+
+    # Fetch cookies once for the session
+    try:
+        if zenrows_client:
+            # Use ZenRows for cookie fetching
+            params = {
+                "url": "https://www.bseindia.com/",
+                "js_render": True,
+                "premium_proxy": True,
+                "proxy_country": "in"
+            }
+            main_page = zenrows_client.get("https://www.bseindia.com/", params=params, timeout=10)
+            main_page.raise_for_status()
+            # Update session cookies with ZenRows response
+            session.cookies.update(main_page.cookies)
+        else:
+            # Standard request
+            main_page = session.get("https://www.bseindia.com/", timeout=10)
+            main_page.raise_for_status()
+    except Exception as e:
+        if debug and log_callback:
+            log_callback(f"Cookie fetch error: {e}")
+        # Continue without cookies, as they may not be required
+
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
 
-        csv_path = f"data/portfolio surpassing_stocks_gpt/{tk['name']}.csv"
+        csv_path = f"data/portfolio_stocks_gpt/{tk['name']}.csv"
         existing_urls = set()
         if os.path.isfile(csv_path):
             try:
@@ -266,19 +293,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 existing_urls = set(df_exist['url'].dropna().astype(str))
             except Exception:
                 pass
-
-        # Initialize session for persistent cookies
-        session = requests.Session()
-        session.headers.update(HEADERS)
-
-        # Fetch main page to capture cookies
-        try:
-            main_page = session.get("https://www.bseindia.com/", timeout=10)
-            main_page.raise_for_status()
-        except Exception as e:
-            if debug and log_callback:
-                log_callback(f"Cookie fetch error for {tk['name']}: {e}")
-            continue
 
         payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
                    "strScrip":tk['bse_code'],"strSearch":"P",
@@ -429,7 +443,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     if progress_callback: progress_callback(1.0)
     if status_callback: status_callback(f"Done: {total_new} new filings.")
     return total_new
-
 
 def load_filtered_data(start_date=None, end_date=None):
     """
