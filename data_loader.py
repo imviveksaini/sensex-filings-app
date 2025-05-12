@@ -223,18 +223,20 @@ def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_
                         log_callback(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
 
 
-def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None, zenrows_api_key=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
     
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
-    #HEADERS = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
     HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/115.0 Safari/537.36",
-    "Referer": "https://www.bseindia.com/"
-}
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.bseindia.com/",
+        "Connection": "keep-alive"
+    }
 
     start = datetime.today() - timedelta(days=days)
     end = datetime.today()
@@ -245,14 +247,18 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     n = len(tickers)
     if debug and log_callback:
         log_callback(f"{n} tickers to process from {start} to {end}")
-    #print(n, start, end)
+
+    # Initialize ZenRows client if API key is provided
+    zenrows_client = None
+    if zenrows_api_key:
+        from zenrows import ZenRowsClient
+        zenrows_client = ZenRowsClient(zenrows_api_key)
 
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
         if progress_callback: progress_callback((i-1)/n)
 
-        #csv_path = os.path.join(default_output_dir, f"{tk['name']}.csv")
-        csv_path = f"data/portfolio_stocks_gpt/{tk['name']}.csv"
+        csv_path = f"data/portfolio surpassing_stocks_gpt/{tk['name']}.csv"
         existing_urls = set()
         if os.path.isfile(csv_path):
             try:
@@ -261,22 +267,50 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             except Exception:
                 pass
 
+        # Initialize session for persistent cookies
+        session = requests.Session()
+        session.headers.update(HEADERS)
+
+        # Fetch main page to capture cookies
+        try:
+            main_page = session.get("https://www.bseindia.com/", timeout=10)
+            main_page.raise_for_status()
+        except Exception as e:
+            if debug and log_callback:
+                log_callback(f"Cookie fetch error for {tk['name']}: {e}")
+            continue
+
         payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
                    "strScrip":tk['bse_code'],"strSearch":"P",
                    "strToDate":to,"strType":"C","subcategory":""}
         ann = []
         while True:
+            # Add random delay to avoid rate-limiting
+            time.sleep(random.uniform(1, 3))
+
             try:
-                r = requests.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
-                r.raise_for_status()
+                if zenrows_client:
+                    # Use ZenRows for scraping
+                    params = {
+                        "url": BSE_API,
+                        "js_render": True,
+                        "premium_proxy": True,
+                        "proxy_country": "in"
+                    }
+                    response = zenrows_client.get(BSE_API, params={**params, **payload}, timeout=10)
+                    response.raise_for_status()
+                else:
+                    # Use standard session-based request
+                    response = session.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
+                    response.raise_for_status()
+                data = response.json().get("Table", [])
+                if not data: break
+                ann.extend(data)
+                payload["pageno"] += 1
             except Exception as e:
                 if debug and log_callback:
                     log_callback(f"Fetch error {tk['name']}: {e}")
                 break
-            data = r.json().get("Table", [])
-            if not data: break
-            ann.extend(data)
-            payload["pageno"] += 1
         if debug and log_callback:
             log_callback(f"{tk['name']}: {len(ann)} announcements")
 
@@ -296,9 +330,24 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     pdf_url = None
                     break  # skip rest of loop
         
+                # Add random delay for PDF requests
+                time.sleep(random.uniform(1, 3))
+
                 try:
-                    tmp = requests.get(path, headers=HEADERS, timeout=10)
-                    tmp.raise_for_status()
+                    if zenrows_client:
+                        # Use ZenRows for PDF download
+                        params = {
+                            "url": path,
+                            "js_render": True,
+                            "premium_proxy": True,
+                            "proxy_country": "in"
+                        }
+                        tmp = zenrows_client.get(path, params=params, timeout=10)
+                        tmp.raise_for_status()
+                    else:
+                        # Use standard session-based request
+                        tmp = session.get(path, headers=HEADERS, timeout=10)
+                        tmp.raise_for_status()
                     pdf = tmp.content
                     pdf_url = path
                     break
@@ -325,8 +374,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             input_text = text[:4000]
             raw_input_text = f"Text:\n{input_text}"
             gpt_response = call_gpt(raw_input_text)
-            #if debug and log_callback:
-            #    log_callback(f"Input: {raw_input_text}\nGPT raw: {gpt_response}")
             
             if not gpt_response:
                 continue
@@ -358,7 +405,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 if debug and log_callback:
                     log_callback(f"⚠️ JSON parse error: {e}")
                 continue
-
 
         if new_records:
             write_header = not os.path.isfile(csv_path)
