@@ -14,6 +14,8 @@ import time
 import random
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from urllib.parse import urlencode
+
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
@@ -227,15 +229,61 @@ def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_
                         log_callback(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
 
 
-def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None, zenrows_api_key=None):
+
+def get_free_proxies(max_proxies=50, timeout=5):
+    """
+    Fetch and validate free proxies from a public API.
+    Returns a list of working proxy URLs (e.g., 'http://ip:port').
+    """
+    proxies = []
+    try:
+        # Fetch proxy list from Geonode API
+        response = requests.get(
+            "https://proxylist.geonode.com/api/proxy-list?limit=50&sort_by=lastChecked&sort_type=desc",
+            timeout=timeout
+        )
+        response.raise_for_status()
+        data = response.json().get("data", [])
+        
+        for proxy in data:
+            ip = proxy.get("ip")
+            port = proxy.get("port")
+            protocols = proxy.get("protocols", [])
+            if "http" in protocols or "https" in protocols:
+                proxy_url = f"http://{ip}:{port}"
+                # Validate proxy by testing a simple request
+                try:
+                    test_response = requests.get(
+                        "https://www.bseindia.com/",
+                        proxies={"http": proxy_url, "https": proxy_url},
+                        timeout=timeout,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0.0.0"}
+                    )
+                    if test_response.status_code == 200:
+                        proxies.append(proxy_url)
+                        if len(proxies) >= max_proxies:
+                            break
+                except:
+                    continue
+    except Exception as e:
+        print(f"Failed to fetch proxies: {e}")
+    
+    return proxies if proxies else ["http://138.68.60.8:3128"]  # Fallback proxy
+
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
     
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
+    USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+    ]
     HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://www.bseindia.com/",
@@ -252,11 +300,10 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     if debug and log_callback:
         log_callback(f"{n} tickers to process from {start} to {end}")
 
-    # Initialize ZenRows client if API key is provided
-    zenrows_client = None
-    if zenrows_api_key:
-        from zenrows import ZenRowsClient
-        zenrows_client = ZenRowsClient(zenrows_api_key)
+    # Fetch and validate free proxies
+    proxies = get_free_proxies()
+    if debug and log_callback:
+        log_callback(f"Available proxies: {len(proxies)}")
 
     # Initialize session for persistent cookies
     session = requests.Session()
@@ -267,23 +314,19 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     session.mount("https://", HTTPAdapter(max_retries=retries))
 
     # Fetch cookies once for the session
+    proxy_index = 0
     try:
-        if zenrows_client:
-            # Use ZenRows for cookie fetching
-            params = {
-                "url": "https://www.bseindia.com/",
-                "js_render": True,
-                "premium_proxy": True,
-                "proxy_country": "in"
-            }
-            main_page = zenrows_client.get("https://www.bseindia.com/", params=params, timeout=20)
-            main_page.raise_for_status()
-            # Update session cookies with ZenRows response
-            session.cookies.update(main_page.cookies)
+        session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+        if proxies:
+            proxy_url = proxies[proxy_index % len(proxies)]
+            main_page = session.get(
+                "https://www.bseindia.com/",
+                proxies={"http": proxy_url, "https": proxy_url},
+                timeout=20
+            )
         else:
-            # Standard request
             main_page = session.get("https://www.bseindia.com/", timeout=20)
-            main_page.raise_for_status()
+        main_page.raise_for_status()
     except Exception as e:
         if debug and log_callback:
             log_callback(f"Cookie fetch error: {e}")
@@ -308,27 +351,30 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         ann = []
         while True:
             # Add random delay to avoid rate-limiting
-            time.sleep(random.uniform(2, 5))  # Increased delay
+            time.sleep(random.uniform(2, 5))
 
             try:
-                if zenrows_client:
-                    # Build full BSE API URL with parameters
-                    req = requests.Request('GET', BSE_API, params=payload)
-                    prepared = req.prepare()
-                    full_url = prepared.url
-                    # Use ZenRows for scraping
-                    params = {
-                        "url": full_url,
-                        "js_render": True,
-                        "premium_proxy": True,
-                        "proxy_country": "in"
-                    }
-                    response = zenrows_client.get(full_url, params=params, timeout=20)
-                    response.raise_for_status()
+                # Rotate User-Agent and proxy
+                session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+                if proxies:
+                    proxy_url = proxies[proxy_index % len(proxies)]
+                    proxy_index = (proxy_index + 1) % len(proxies)  # Rotate proxy
+                    if debug and log_callback:
+                        log_callback(f"Using proxy: {proxy_url}")
                 else:
-                    # Use standard session-based request
-                    response = session.get(BSE_API, headers=HEADERS, params=payload, timeout=20)
-                    response.raise_for_status()
+                    proxy_url = None
+
+                # Build full BSE API URL with parameters
+                req = requests.Request('GET', BSE_API, params=payload)
+                prepared = req.prepare()
+                full_url = prepared.url
+
+                response = session.get(
+                    full_url,
+                    proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                    timeout=20
+                )
+                response.raise_for_status()
                 data = response.json().get("Table", [])
                 if not data: break
                 ann.extend(data)
@@ -353,37 +399,37 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
                 f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"
             ]:
-                if path in existing_urls:  # ✅ Skip if already processed
+                if path in existing_urls:
                     if debug and log_callback:
                         log_callback(f"⏩ Skipping already processed URL: {path}")
                     pdf_url = None
-                    break  # skip rest of loop
+                    break
         
-                # Add random delay for PDF requests
-                time.sleep(random.uniform(2, 5))  # Increased delay
+                time.sleep(random.uniform(2, 5))
 
                 try:
-                    if zenrows_client:
-                        # Use ZenRows for PDF download
-                        params = {
-                            "url": path,
-                            "js_render": True,
-                            "premium_proxy": True,
-                            "proxy_country": "in"
-                        }
-                        tmp = zenrows_client.get(path, params=params, timeout=20)
-                        tmp.raise_for_status()
+                    session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+                    if proxies:
+                        proxy_url = proxies[proxy_index % len(proxies)]
+                        proxy_index = (proxy_index + 1) % len(proxies)
+                        if debug and log_callback:
+                            log_callback(f"Using proxy: {proxy_url}")
                     else:
-                        # Use standard session-based request
-                        tmp = session.get(path, headers=HEADERS, timeout=20)
-                        tmp.raise_for_status()
+                        proxy_url = None
+
+                    tmp = session.get(
+                        path,
+                        proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                        timeout=20
+                    )
+                    tmp.raise_for_status()
                     pdf = tmp.content
                     pdf_url = path
                     break
                 except:
                     continue
         
-            if not pdf_url:  # either already processed or download failed
+            if not pdf_url:
                 continue
 
             raw = item.get("DissemDT","")
@@ -408,9 +454,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 continue
             
             try:
-                # Parse the JSON string from GPT
                 parsed = json.loads(gpt_response)
-            
                 summary = parsed.get('summary', '')
                 sentiment = parsed.get('sentiment', '')
                 category = parsed.get('category', '')
@@ -443,7 +487,6 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 writer.writerows(new_records)
             total_new += len(new_records)
 
-            # ✅ Upload to GitHub
             try:
                 upload_to_github(
                     filepath=csv_path,
