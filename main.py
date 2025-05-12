@@ -95,11 +95,15 @@ if refresh_button:
         status_ph.error("❌ Incorrect magic key. Refresh not allowed.")
 
 if refresh:
+    # Get ZenRows API key from UI input or environment variable
+    #zenrows_api_key = st.session_state.get("zenrows_api_key", os.getenv("ZENROWS_API_KEY", None))
+    zenrows_api_key = st.secrets.get("ZENROWS_API_KEY", os.getenv("ZENROWS_API_KEY"))
+    
     start_time = time.time()
     def status(msg): status_ph.text(msg)
     def progress(p): progress_ph.progress(p)
     from data_loader import load_filtered_data as raw_loader  # use uncached version to refresh
-    new_count = update_filings_data(days=days, debug=debug, status_callback=status, progress_callback=progress, log_callback=log)
+    new_count = update_filings_data(days=days, debug=debug, status_callback=status, progress_callback=progress, log_callback=log, zenrows_api_key=zenrows_api_key)
     elapsed = time.time() - start_time
     status_ph.text(f"Completed in {elapsed:.1f}s — {new_count} new filings added.")
     progress_ph.empty()
