@@ -351,7 +351,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         ann = []
         while True:
             # Add random delay to avoid rate-limiting
-            time.sleep(random.uniform(2, 5))
+            time.sleep(random.uniform(1, 3))
 
             try:
                 # Rotate User-Agent and proxy
