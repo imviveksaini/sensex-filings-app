@@ -11,6 +11,7 @@ import streamlit as st
 import json
 import base64
 import time
+import random
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
