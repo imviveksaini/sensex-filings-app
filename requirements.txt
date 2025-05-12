@@ -11,3 +11,4 @@ lxml
 torch
 sentencepiece
 openai
+zenrows
