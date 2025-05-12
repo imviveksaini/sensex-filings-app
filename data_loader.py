@@ -231,31 +231,68 @@ def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_
 
 
 
-def get_free_proxies(max_proxies=50, timeout=5):
+import random
+import requests
+import time
+from datetime import datetime, timedelta
+import os
+import pandas as pd
+import csv
+import json
+from io import BytesIO
+from PyPDF2 import PdfReader
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from urllib.parse import urlencode
+
+def get_free_proxies(max_proxies=50, timeout=10):
     """
-    Fetch and validate free proxies from a public API.
+    Fetch and validate free proxies from multiple sources.
     Returns a list of working proxy URLs (e.g., 'http://ip:port').
     """
     proxies = []
-    try:
-        # Fetch proxy list from Geonode API
-        response = requests.get(
-            "https://proxylist.geonode.com/api/proxy-list?limit=50&sort_by=lastChecked&sort_type=desc",
-            timeout=timeout
-        )
-        response.raise_for_status()
-        data = response.json().get("data", [])
-        
-        for proxy in data:
-            ip = proxy.get("ip")
-            port = proxy.get("port")
-            protocols = proxy.get("protocols", [])
-            if "http" in protocols or "https" in protocols:
-                proxy_url = f"http://{ip}:{port}"
-                # Validate proxy by testing a simple request
+    sources = [
+        # Geonode API
+        {
+            "url": "https://proxylist.geonode.com/api/proxy-list?limit=50&sort_by=lastChecked&sort_type=desc",
+            "type": "api",
+            "extract": lambda data: [(item["ip"], item["port"]) for item in data.get("data", []) if "http" in item.get("protocols", []) or "https" in item.get("protocols", [])]
+        },
+        # ProxyScrape API (India-based proxies)
+        {
+            "url": "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=IN",
+            "type": "text",
+            "extract": lambda text: [(line.strip(), None) for line in text.splitlines()]
+        },
+        # Fallback static proxy (replace with fresh ones if needed)
+        {
+            "url": None,
+            "type": "static",
+            "extract": lambda _: [("138.68.60.8", "3128"), ("51.210.19.141", "80")]
+        }
+    ]
+
+    for source in sources:
+        if len(proxies) >= max_proxies:
+            break
+        try:
+            if source["type"] == "api":
+                response = requests.get(source["url"], timeout=timeout)
+                response.raise_for_status()
+                proxy_pairs = source["extract"](response.json())
+            elif source["type"] == "text":
+                response = requests.get(source["url"], timeout=timeout)
+                response.raise_for_status()
+                proxy_pairs = source["extract"](response.text)
+            else:  # static
+                proxy_pairs = source["extract"](None)
+
+            for ip, port in proxy_pairs:
+                proxy_url = f"http://{ip}:{port}" if port else f"http://{ip}"
+                # Validate proxy with a simple URL to avoid BSE India's anti-bot
                 try:
                     test_response = requests.get(
-                        "https://www.bseindia.com/",
+                        "https://httpbin.org/ip",  # Simpler test URL
                         proxies={"http": proxy_url, "https": proxy_url},
                         timeout=timeout,
                         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0.0.0"}
@@ -264,19 +301,21 @@ def get_free_proxies(max_proxies=50, timeout=5):
                         proxies.append(proxy_url)
                         if len(proxies) >= max_proxies:
                             break
-                except:
-                    continue
-    except Exception as e:
-        print(f"Failed to fetch proxies: {e}")
-    
+                except Exception as e:
+                    print(f"Proxy validation failed for {proxy_url}: {e}")
+        except Exception as e:
+            print(f"Failed to fetch proxies from {source.get('url', 'static')}: {e}")
+
     return proxies if proxies else ["http://138.68.60.8:3128"]  # Fallback proxy
 
-def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None, tickers=None):
     """
     Scrape and GPT process filings; append only new filings to existing ticker CSVs.
     Returns total new records appended.
     """
-    
+    if tickers is None:
+        tickers = [...]  # Your default ticker list (replace with actual list)
+
     BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
     USER_AGENTS = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
@@ -314,24 +353,30 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
     session.mount("https://", HTTPAdapter(max_retries=retries))
 
-    # Fetch cookies once for the session
+    # Fetch cookies
     proxy_index = 0
-    try:
-        session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
-        if proxies:
-            proxy_url = proxies[proxy_index % len(proxies)]
+    max_proxy_tries = len(proxies) if proxies else 1
+    for _ in range(max_proxy_tries):
+        try:
+            session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+            proxy_url = proxies[proxy_index % len(proxies)] if proxies else None
+            if debug and log_callback:
+                log_callback(f"Using proxy for cookies: {proxy_url or 'direct'}")
             main_page = session.get(
                 "https://www.bseindia.com/",
-                proxies={"http": proxy_url, "https": proxy_url},
-                timeout=20
+                proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                timeout=30  # Increased timeout
             )
-        else:
-            main_page = session.get("https://www.bseindia.com/", timeout=20)
-        main_page.raise_for_status()
-    except Exception as e:
-        if debug and log_callback:
-            log_callback(f"Cookie fetch error: {e}")
-        # Continue without cookies, as they may not be required
+            main_page.raise_for_status()
+            break
+        except Exception as e:
+            if debug and log_callback:
+                log_callback(f"Cookie fetch error with proxy {proxy_url or 'direct'}: {e}")
+            proxy_index += 1
+            if proxy_index >= max_proxy_tries:
+                if debug and log_callback:
+                    log_callback("All proxies failed for cookies; continuing without cookies")
+                break
 
     for i, tk in enumerate(tickers, 1):
         if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
@@ -351,42 +396,45 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                    "strToDate":to,"strType":"C","subcategory":""}
         ann = []
         while True:
-            # Add random delay to avoid rate-limiting
-            time.sleep(random.uniform(1, 3))
+            time.sleep(random.uniform(1, 3))  # Reduced delay
 
-            try:
-                # Rotate User-Agent and proxy
-                session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
-                if proxies:
-                    proxy_url = proxies[proxy_index % len(proxies)]
-                    proxy_index = (proxy_index + 1) % len(proxies)  # Rotate proxy
+            proxy_index = 0
+            for _ in range(max_proxy_tries):
+                try:
+                    session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+                    proxy_url = proxies[proxy_index % len(proxies)] if proxies else None
                     if debug and log_callback:
-                        log_callback(f"Using proxy: {proxy_url}")
-                else:
-                    proxy_url = None
-
-                # Build full BSE API URL with parameters
-                req = requests.Request('GET', BSE_API, params=payload)
-                prepared = req.prepare()
-                full_url = prepared.url
-
-                response = session.get(
-                    full_url,
-                    proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
-                    timeout=20
-                )
-                response.raise_for_status()
-                data = response.json().get("Table", [])
-                if not data: break
-                ann.extend(data)
-                payload["pageno"] += 1
-            except Exception as e:
-                if debug and log_callback:
-                    log_callback(f"Fetch error {tk['name']}: {e}")
-                    if 'response' in locals():
-                        log_callback(f"Fetch response headers: {response.headers}")
-                        log_callback(f"Fetch response content: {response.text[:500]}")
+                        log_callback(f"Using proxy: {proxy_url or 'direct'}")
+                    req = requests.Request('GET', BSE_API, params=payload)
+                    prepared = req.prepare()
+                    full_url = prepared.url
+                    response = session.get(
+                        full_url,
+                        proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                        timeout=30  # Increased timeout
+                    )
+                    response.raise_for_status()
+                    data = response.json().get("Table", [])
+                    if not data: break
+                    ann.extend(data)
+                    payload["pageno"] += 1
+                    break
+                except Exception as e:
+                    if debug and log_callback:
+                        log_callback(f"Fetch error {tk['name']} with proxy {proxy_url or 'direct'}: {e}")
+                        if 'response' in locals():
+                            log_callback(f"Fetch response headers: {response.headers}")
+                            log_callback(f"Fetch response content: {response.text[:500]}")
+                    proxy_index += 1
+                    if proxy_index >= max_proxy_tries:
+                        if debug and log_callback:
+                            log_callback(f"All proxies failed for {tk['name']}; skipping")
+                        break
+            else:
+                break  # Exit pagination loop if all proxies fail
+            if not data:
                 break
+
         if debug and log_callback:
             log_callback(f"{tk['name']}: {len(ann)} announcements")
 
@@ -405,31 +453,38 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                         log_callback(f"⏩ Skipping already processed URL: {path}")
                     pdf_url = None
                     break
-        
-                time.sleep(random.uniform(2, 5))
 
-                try:
-                    session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
-                    if proxies:
-                        proxy_url = proxies[proxy_index % len(proxies)]
-                        proxy_index = (proxy_index + 1) % len(proxies)
+                time.sleep(random.uniform(1, 3))  # Reduced delay
+
+                proxy_index = 0
+                for _ in range(max_proxy_tries):
+                    try:
+                        session.headers.update({"User-Agent": random.choice(USER_AGENTS)})
+                        proxy_url = proxies[proxy_index % len(proxies)] if proxies else None
                         if debug and log_callback:
-                            log_callback(f"Using proxy: {proxy_url}")
-                    else:
-                        proxy_url = None
-
-                    tmp = session.get(
-                        path,
-                        proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
-                        timeout=20
-                    )
-                    tmp.raise_for_status()
-                    pdf = tmp.content
-                    pdf_url = path
+                            log_callback(f"Using proxy: {proxy_url or 'direct'}")
+                        tmp = session.get(
+                            path,
+                            proxies={"http": proxy_url, "https": proxy_url} if proxy_url else None,
+                            timeout=30  # Increased timeout
+                        )
+                        tmp.raise_for_status()
+                        pdf = tmp.content
+                        pdf_url = path
+                        break
+                    except Exception as e:
+                        if debug and log_callback:
+                            log_callback(f"PDF fetch error for {path} with proxy {proxy_url or 'direct'}: {e}")
+                        proxy_index += 1
+                        if proxy_index >= max_proxy_tries:
+                            if debug and log_callback:
+                                log_callback(f"All proxies failed for PDF {path}; skipping")
+                            break
+                else:
+                    break  # Exit PDF loop if all proxies fail
+                if pdf_url:
                     break
-                except:
-                    continue
-        
+
             if not pdf_url:
                 continue
 
