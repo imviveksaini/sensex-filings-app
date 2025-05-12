@@ -12,6 +12,8 @@ import json
 import base64
 import time
 import random
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Suppress HF progress bars
 os.environ["TRANSFORMERS_NO_TQDM"] = "1"
@@ -260,6 +262,10 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
     session = requests.Session()
     session.headers.update(HEADERS)
 
+    # Add retry strategy to session
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+
     # Fetch cookies once for the session
     try:
         if zenrows_client:
@@ -270,13 +276,13 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                 "premium_proxy": True,
                 "proxy_country": "in"
             }
-            main_page = zenrows_client.get("https://www.bseindia.com/", params=params, timeout=10)
+            main_page = zenrows_client.get("https://www.bseindia.com/", params=params, timeout=20)
             main_page.raise_for_status()
             # Update session cookies with ZenRows response
             session.cookies.update(main_page.cookies)
         else:
             # Standard request
-            main_page = session.get("https://www.bseindia.com/", timeout=10)
+            main_page = session.get("https://www.bseindia.com/", timeout=20)
             main_page.raise_for_status()
     except Exception as e:
         if debug and log_callback:
@@ -302,22 +308,26 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
         ann = []
         while True:
             # Add random delay to avoid rate-limiting
-            time.sleep(random.uniform(1, 3))
+            time.sleep(random.uniform(2, 5))  # Increased delay
 
             try:
                 if zenrows_client:
+                    # Build full BSE API URL with parameters
+                    req = requests.Request('GET', BSE_API, params=payload)
+                    prepared = req.prepare()
+                    full_url = prepared.url
                     # Use ZenRows for scraping
                     params = {
-                        "url": BSE_API,
+                        "url": full_url,
                         "js_render": True,
                         "premium_proxy": True,
                         "proxy_country": "in"
                     }
-                    response = zenrows_client.get(BSE_API, params={**params, **payload}, timeout=10)
+                    response = zenrows_client.get(full_url, params=params, timeout=20)
                     response.raise_for_status()
                 else:
                     # Use standard session-based request
-                    response = session.get(BSE_API, headers=HEADERS, params=payload, timeout=10)
+                    response = session.get(BSE_API, headers=HEADERS, params=payload, timeout=20)
                     response.raise_for_status()
                 data = response.json().get("Table", [])
                 if not data: break
@@ -326,6 +336,9 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
             except Exception as e:
                 if debug and log_callback:
                     log_callback(f"Fetch error {tk['name']}: {e}")
+                    if 'response' in locals():
+                        log_callback(f"Fetch response headers: {response.headers}")
+                        log_callback(f"Fetch response content: {response.text[:500]}")
                 break
         if debug and log_callback:
             log_callback(f"{tk['name']}: {len(ann)} announcements")
@@ -347,7 +360,7 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                     break  # skip rest of loop
         
                 # Add random delay for PDF requests
-                time.sleep(random.uniform(1, 3))
+                time.sleep(random.uniform(2, 5))  # Increased delay
 
                 try:
                     if zenrows_client:
@@ -358,11 +371,11 @@ def update_filings_data(days=2, debug=False, status_callback=None, progress_call
                             "premium_proxy": True,
                             "proxy_country": "in"
                         }
-                        tmp = zenrows_client.get(path, params=params, timeout=10)
+                        tmp = zenrows_client.get(path, params=params, timeout=20)
                         tmp.raise_for_status()
                     else:
                         # Use standard session-based request
-                        tmp = session.get(path, headers=HEADERS, timeout=10)
+                        tmp = session.get(path, headers=HEADERS, timeout=20)
                         tmp.raise_for_status()
                     pdf = tmp.content
                     pdf_url = path
