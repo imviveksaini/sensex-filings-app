@@ -1,0 +1,498 @@
+import os
+import csv
+import pandas as pd
+import requests
+from io import BytesIO
+from datetime import datetime, timedelta
+from PyPDF2 import PdfReader
+import openai
+from openai import OpenAI
+import streamlit as st
+import json
+import base64
+import time
+import random
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# Suppress HF progress bars
+os.environ["TRANSFORMERS_NO_TQDM"] = "1"
+
+# --- Constants & Directories ---
+#default_output_dir = os.path.join(os.getcwd(), "data", "portfolio_stocks_gpt")
+#os.makedirs(default_output_dir, exist_ok=True)
+
+tickers = [
+    {"name": "NCC",             "bse_code": "500294"},
+    {"name": "JYOTHYLABS",     "bse_code": "532926"},
+    {"name": "SHEELAFOAM",     "bse_code": "540203"},
+    {"name": "KEC",             "bse_code": "532714"},
+    {"name": "KPIL",            "bse_code": "505283"},
+    {"name": "HCC",             "bse_code": "500185"},
+    {"name": "OLECTRA",         "bse_code": "532439"},
+    {"name": "LTF",             "bse_code": "533519"},
+    {"name": "MAYURUNIQUOTERS", "bse_code": "522249"},
+    {"name": "ABFRL",           "bse_code": "535755"},  # Aditya Birla Fashion & Retail
+    {"name": "SHK",             "bse_code": "539450"},  # S H Kelkar
+    {"name": "BLS",             "bse_code": "540073"},
+    {"name": "APOLLOTYRE",      "bse_code": "500877"},
+    {"name": "OMINFRA",         "bse_code": "531092"},
+    {"name": "TRITURBINE",      "bse_code": "533655"},
+    {"name": "PRAJIND",         "bse_code": "522205"},
+    {"name": "AHLUCONT",        "bse_code": "532811"},
+    {"name": "INDHOTEL",        "bse_code": "500850"},
+    {"name": "INDIGO",          "bse_code": "539448"},
+    {"name": "M&MFIN",          "bse_code": "532720"},
+    {"name": "PVRINOX",         "bse_code": "532689"},
+    {"name": "VIPIND",          "bse_code": "507880"},
+    {"name": "VGUARD",          "bse_code": "532953"},
+    {"name": "WABAG",           "bse_code": "533269"},  # VA Tech Wabag
+    {"name": "WONDERLA",        "bse_code": "538268"},
+    {"name": "AXISBANK",        "bse_code": "532215"},
+    {"name": "BATAINDIA",       "bse_code": "500043"},
+    {"name": "FLUIDOMAT",       "bse_code": "522017"},        
+    {"name": "HDFCBANK",        "bse_code": "500180"},
+    {"name": "ICICIBANK",       "bse_code": "532174"},
+    {"name": "ITCHOTEL",        "bse_code": "544325"},  # ITC Hotels
+    {"name": "ITC",             "bse_code": "500875"},
+    {"name": "INFOSYS",         "bse_code": "500209"},
+    {"name": "KEI",             "bse_code": "517569"},
+    {"name": "LT",              "bse_code": "500510"},
+    {"name": "LEMONTREE",       "bse_code": "540063"},
+    {"name": "MANAPPURAM",      "bse_code": "531213"},
+    {"name": "PNB",             "bse_code": "532461"},
+    {"name": "SIEMENS",         "bse_code": "500650"},
+    {"name": "SWSOLAR",         "bse_code": "543248"},
+    {"name": "TATAMOTORS",      "bse_code": "500570"},
+    {"name": "VEDANTFASHION",   "bse_code": "543389"},
+    {"name": "VOLTAS",          "bse_code": "500575"},
+    {"name": "ANGELONE",        "bse_code": "543235"},
+    {"name": "BHEL",            "bse_code": "500103"},
+    {"name": "MOLDTEK",         "bse_code": "540287"},
+    {"name": "DABUR",           "bse_code": "500096"},
+    {"name": "HINDUNILVR",      "bse_code": "500696"},
+    {"name": "JUBLFOOD",        "bse_code": "543225"},
+    {"name": "KOTAKBANK",       "bse_code": "500247"},
+    {"name": "RIL",             "bse_code": "500325"},
+    {"name": "VMM",             "bse_code": "544307"},
+    {"name": "ELECON",          "bse_code": "505700"}
+]
+
+def upload_to_github(filepath, repo, path_in_repo, branch="main_sensex"):
+    token = st.secrets.get("GITHUB_TOKEN", os.getenv("GITHUB_TOKEN"))
+    if not token:
+        raise ValueError("GitHub token not found")
+
+    with open(filepath, "rb") as f:
+        content = f.read()
+    content_b64 = base64.b64encode(content).decode()
+
+    url = f"https://api.github.com/repos/{repo}/contents/{path_in_repo}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    get_resp = requests.get(url, headers=headers, params={"ref": branch})
+    sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+
+    data = {
+        "message": f"Upload {path_in_repo}",
+        "content": content_b64,
+        "branch": branch
+    }
+    if sha:
+        data["sha"] = sha
+
+    put_resp = requests.put(url, headers=headers, json=data)
+    if put_resp.status_code not in (200, 201):
+        raise Exception(f"Upload failed: {put_resp.status_code} - {put_resp.text}")
+
+
+
+def call_gpt(raw_input_text: str) -> dict:
+    # Retrieve the API key
+    my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+    try:
+        client = OpenAI(api_key=my_api_key)
+        user_prompt = f'''
+        You're an expert in reading corporate filings on Indian stocks.
+        
+        Understand the following filing and analyze it carefully.
+        
+        Respond **only** in valid JSON format with exactly two keys:
+        1. "summary": a brief summary of the filing in maximum 3 lines, bullet points. First word should be either "Important." or "Not important.", depending upon how impactful the filing is for stock prices of this company.
+        2. "sentiment": how bullish are you on its stock based on the information in the filing. 100= very bullish, -100= very bearish.
+        3. "category": Categoriese this news in a news category between 1-3 words only. But if the filing text contains "audio recording" or "transcript" in the first 300 words of the text, write "earnings_call_transcript" as category.
+        Filing text:
+        {raw_input_text}
+        '''
+        
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano",
+            temperature=0,
+            messages=[
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"GPT API call failed: {e}")
+        return None
+
+
+def update_filings_data_tmp(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None):
+    # Configuration
+    SCRIP_CODE = "533282"  # Gravita Industries BSE code
+
+    
+    # Date range: last 30 days
+    end_date = datetime.today()
+    start_date = end_date - timedelta(days=30)
+    date_fmt = "%Y%m%d"
+    params = {
+        "pageno": 1,
+        "strPrevDate": start_date.strftime(date_fmt),
+        "strToDate": end_date.strftime(date_fmt),
+        "strScrip": SCRIP_CODE,
+        "strType": "C",      # corporate announcements
+        "strCat": "-1",      # all categories
+        "strSearch": "P",    # public announcements
+        "subcategory": ""    # all subcategories
+    }
+    # headers = {
+    #     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/115.0 Safari/537.36",
+    #     "Referer": "https://www.bseindia.com/"
+    # }
+    headers = {"User-Agent":"Mozilla/5.0","Referer":"https://www.bseindia.com/"}
+    
+    announcements = []  # to collect announcements
+    
+    # Loop through pages until no more data
+    while True:
+        resp = requests.get("https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w", 
+                            params=params, headers=headers)
+        
+        if resp.status_code != 200:
+            if debug and log_callback:
+                log_callback(f"HTTP error: {resp.status_code} for SCRIP {SCRIP_CODE}")
+            break
+        
+        try:
+            data = resp.json()
+        except ValueError:
+            if debug and log_callback:
+                log_callback(f"Non-JSON response for SCRIP {SCRIP_CODE}: {resp.text[:200]}")
+            break
+        
+        # Stop if no data or on error
+        if "Table" not in data or not data["Table"]:
+            break
+        announcements.extend(data["Table"])
+        params["pageno"] += 1  # next page
+    
+    # Logging: print sample announcement for inspection
+    if announcements:
+        print("Sample Announcement:")
+        print(announcements[0])
+    
+    # Process each announcement to download attachment if available
+    for ann in announcements:
+        title = ann.get("HEADLINE") or ann.get("NEWSSUB")
+        datetime_str = ann.get("DissemDT", "")
+        date_part = datetime_str.split("T")[0] if "T" in datetime_str else datetime_str
+        
+        # Build the attachment URL if a PDF is present
+        attachment_name = ann.get("ATTACHMENTNAME")
+        if attachment_name:
+            file_url = f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attachment_name}"
+            file_path = os.path.join(OUTPUT_DIR, attachment_name)
+            
+            # Log attachment name and URL for verification
+            #print(f"Attachment: {attachment_name} -> URL: {file_url}")
+            if debug and log_callback:
+                        log_callback(f"Attachment: {attachment_name} -> URL: {file_url}")
+            
+            file_resp = requests.get(file_url, headers=headers)
+            if file_resp.status_code == 200:
+                with open(file_path, "wb") as f:
+                    #f.write(file_resp.content)
+                    #print(f"Downloaded: {title[:50]}... -> {file_path}")
+                    if debug and log_callback:
+                            log_callback(f"Downloaded: {title[:50]}... -> {file_path}")
+            else:
+                #print(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
+                if debug and log_callback:
+                        log_callback(f"Failed to download {attachment_name}: HTTP {file_resp.status_code}")
+
+
+def update_filings_data(days=2, debug=False, status_callback=None, progress_callback=None, log_callback=None, zenrows_api_key=None):
+    """
+    Scrape and GPT process filings; append only new filings to existing ticker CSVs.
+    Returns total new records appended.
+    """
+    
+    BSE_API = "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w"
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.bseindia.com/",
+        "Connection": "keep-alive"
+    }
+
+    start = datetime.today() - timedelta(days=days)
+    end = datetime.today()
+    prev = start.strftime("%Y%m%d")
+    to = end.strftime("%Y%m%d")
+
+    total_new = 0
+    n = len(tickers)
+    if debug and log_callback:
+        log_callback(f"{n} tickers to process from {start} to {end}")
+
+    # Initialize ZenRows client if API key is provided
+    zenrows_client = None
+    if zenrows_api_key:
+        from zenrows import ZenRowsClient
+        zenrows_client = ZenRowsClient(zenrows_api_key)
+
+    # Initialize session for persistent cookies
+    session = requests.Session()
+    session.headers.update(HEADERS)
+
+    # Add retry strategy to session
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+
+    # Fetch cookies once for the session
+    try:
+        if zenrows_client:
+            # Use ZenRows for cookie fetching
+            params = {
+                "url": "https://www.bseindia.com/",
+                "js_render": True,
+                "premium_proxy": True,
+                "proxy_country": "in"
+            }
+            main_page = zenrows_client.get("https://www.bseindia.com/", params=params, timeout=20)
+            main_page.raise_for_status()
+            # Update session cookies with ZenRows response
+            session.cookies.update(main_page.cookies)
+        else:
+            # Standard request
+            main_page = session.get("https://www.bseindia.com/", timeout=20)
+            main_page.raise_for_status()
+    except Exception as e:
+        if debug and log_callback:
+            log_callback(f"Cookie fetch error: {e}")
+        # Continue without cookies, as they may not be required
+
+    for i, tk in enumerate(tickers, 1):
+        if status_callback: status_callback(f"Processing {tk['name']} ({i}/{n})")
+        if progress_callback: progress_callback((i-1)/n)
+
+        csv_path = f"data/portfolio_stocks_gpt/{tk['name']}.csv"
+        existing_urls = set()
+        if os.path.isfile(csv_path):
+            try:
+                df_exist = pd.read_csv(csv_path)
+                existing_urls = set(df_exist['url'].dropna().astype(str))
+            except Exception:
+                pass
+
+        payload = {"pageno":1,"strCat":"-1","strPrevDate":prev,
+                   "strScrip":tk['bse_code'],"strSearch":"P",
+                   "strToDate":to,"strType":"C","subcategory":""}
+        ann = []
+        while True:
+            # Add random delay to avoid rate-limiting
+            time.sleep(random.uniform(2, 5))  # Increased delay
+
+            try:
+                if zenrows_client:
+                    # Build full BSE API URL with parameters
+                    req = requests.Request('GET', BSE_API, params=payload)
+                    prepared = req.prepare()
+                    full_url = prepared.url
+                    # Use ZenRows for scraping
+                    params = {
+                        "url": full_url,
+                        "js_render": True,
+                        "premium_proxy": True,
+                        "proxy_country": "in"
+                    }
+                    response = zenrows_client.get(full_url, params=params, timeout=20)
+                    response.raise_for_status()
+                else:
+                    # Use standard session-based request
+                    response = session.get(BSE_API, headers=HEADERS, params=payload, timeout=20)
+                    response.raise_for_status()
+                data = response.json().get("Table", [])
+                if not data: break
+                ann.extend(data)
+                payload["pageno"] += 1
+            except Exception as e:
+                if debug and log_callback:
+                    log_callback(f"Fetch error {tk['name']}: {e}")
+                    if 'response' in locals():
+                        log_callback(f"Fetch response headers: {response.headers}")
+                        log_callback(f"Fetch response content: {response.text[:500]}")
+                break
+        if debug and log_callback:
+            log_callback(f"{tk['name']}: {len(ann)} announcements")
+
+        new_records = []
+        for item in ann:
+            attach = item.get("ATTACHMENTNAME","").strip()
+            if not attach: continue
+
+            pdf = None; pdf_url = None
+            for path in [
+                f"https://www.bseindia.com/xml-data/corpfiling/AttachLive/{attach}",
+                f"https://www.bseindia.com/xml-data/corpfiling/AttachHis/{attach}"
+            ]:
+                if path in existing_urls:  # ✅ Skip if already processed
+                    if debug and log_callback:
+                        log_callback(f"⏩ Skipping already processed URL: {path}")
+                    pdf_url = None
+                    break  # skip rest of loop
+        
+                # Add random delay for PDF requests
+                time.sleep(random.uniform(2, 5))  # Increased delay
+
+                try:
+                    if zenrows_client:
+                        # Use ZenRows for PDF download
+                        params = {
+                            "url": path,
+                            "js_render": True,
+                            "premium_proxy": True,
+                            "proxy_country": "in"
+                        }
+                        tmp = zenrows_client.get(path, params=params, timeout=20)
+                        tmp.raise_for_status()
+                    else:
+                        # Use standard session-based request
+                        tmp = session.get(path, headers=HEADERS, timeout=20)
+                        tmp.raise_for_status()
+                    pdf = tmp.content
+                    pdf_url = path
+                    break
+                except:
+                    continue
+        
+            if not pdf_url:  # either already processed or download failed
+                continue
+
+            raw = item.get("DissemDT","")
+            try: d = raw.split("T")[0]; date = datetime.fromisoformat(d).strftime("%Y-%m-%d")
+            except: date = datetime.today().strftime("%Y-%m-%d")
+
+            text = ""
+            try:
+                for p in PdfReader(BytesIO(pdf)).pages:
+                    t = p.extract_text() or ""; text += t + "\n"
+            except Exception as e:
+                if debug and log_callback:
+                    log_callback(f"Extract error: {e}")
+                continue
+            if not text.strip(): continue
+
+            input_text = text[:4000]
+            raw_input_text = f"Text:\n{input_text}"
+            gpt_response = call_gpt(raw_input_text)
+            
+            if not gpt_response:
+                continue
+            
+            try:
+                # Parse the JSON string from GPT
+                parsed = json.loads(gpt_response)
+            
+                summary = parsed.get('summary', '')
+                sentiment = parsed.get('sentiment', '')
+                category = parsed.get('category', '')
+            
+                if debug and log_callback:
+                    log_callback(f"📝 Summary GPT: {summary}")
+                    log_callback(f"📈 Sentiment GPT: {sentiment}")
+                    log_callback(f"🏷️ Category GPT: {category}")
+            
+                new_records.append({
+                    'ticker': tk['name'],
+                    'code': tk['bse_code'],
+                    'date': date,
+                    'summary_gpt': summary,
+                    'sentiment_gpt': sentiment,
+                    'category_gpt': category,
+                    'url': pdf_url
+                })
+            
+            except (ValueError, json.JSONDecodeError) as e:
+                if debug and log_callback:
+                    log_callback(f"⚠️ JSON parse error: {e}")
+                continue
+
+        if new_records:
+            write_header = not os.path.isfile(csv_path)
+            with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=new_records[0].keys())
+                if write_header: writer.writeheader()
+                writer.writerows(new_records)
+            total_new += len(new_records)
+
+            # ✅ Upload to GitHub
+            try:
+                upload_to_github(
+                    filepath=csv_path,
+                    repo="imviveksaini/sensex-filings-app",
+                    path_in_repo=f"data/portfolio_stocks_gpt/{tk['name']}.csv",
+                    branch="main_sensex"
+                )
+            except Exception as e:
+                if debug and log_callback:
+                    log_callback(f"GitHub upload failed for {tk['name']}: {e}")
+
+    if progress_callback: progress_callback(1.0)
+    if status_callback: status_callback(f"Done: {total_new} new filings.")
+    return total_new
+
+def load_filtered_data(start_date=None, end_date=None):
+    """
+    Reads all per-ticker CSVs, concatenates, and filters by date.
+    Expects columns: ticker, code, date, sum_bart, sum_peg, sum_t5,
+    vader, finbert, finbert_s, distil, distil_s, url
+    Returns DataFrame with:
+      - ticker_name, ticker_bse, date_of_filing,
+        summary columns, sentiment columns, url
+    """
+    base_url = "https://raw.githubusercontent.com/imviveksaini/sensex-filings-app/main_sensex/data/portfolio_stocks_gpt"
+
+
+    dfs = []
+    for tk in tickers:
+        ticker_name = tk["name"]
+        url = f"{base_url}/{ticker_name}.csv"
+        try:
+            df = pd.read_csv(url, parse_dates=['date'])
+            df = df.rename(columns={
+                'ticker':'ticker_name','code':'ticker_bse',
+                'date':'date_of_filing',
+                'summary_gpt':'summary_gpt','sentiment_gpt':'sentiment_gpt','category_gpt':'category_gpt',
+                'url':'url'
+            })
+            dfs.append(df)
+        except Exception:
+            continue
+    if not dfs:
+        return pd.DataFrame()
+
+    full = pd.concat(dfs, ignore_index=True)
+    full = full.drop_duplicates()
+    if start_date:
+        full = full[full['date_of_filing'] >= pd.to_datetime(start_date)]
+    if end_date:
+        full = full[full['date_of_filing'] <= pd.to_datetime(end_date)]
+    return full
