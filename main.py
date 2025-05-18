@@ -93,7 +93,31 @@ if st.session_state.page == "landing":
     if "summary_result" in st.session_state and "extracted_text" in st.session_state:
         show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary")
         if show_extracted_text:
-            st.code(st.session_state["extracted_text"], language="markdown")
+            #st.code(st.session_state["extracted_text"], language="markdown")
+            formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
+
+            st.markdown(
+                f"""
+                <div style="
+                    width: 100%;
+                    max-width: 100%;
+                    font-size: 0.5rem;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    font-family: monospace;
+                    line-height: 1.6;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    padding: 1em;
+                    background-color: #f8f8f8;
+                    overflow-x: auto;
+                    box-sizing: border-box;
+                ">
+                    {formatted_text}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         else:
             st.code(st.session_state["summary_result"], language="json")
 
