@@ -12,3 +12,4 @@ torch
 sentencepiece
 openai
 zenrows
+whisper
