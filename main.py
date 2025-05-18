@@ -184,7 +184,17 @@ if st.session_state.page == "landing":
             #     unsafe_allow_html=True
             # )
         else:
-            st.code(st.session_state["summary_result"], language="json")
+            #st.code(st.session_state["summary_result"], language="json")
+            escaped_json = html.escape(st.session_state["summary_result"])
+
+            st.markdown(
+                f"""
+                <div style="font-size: 5px; font-family: monospace; white-space: pre;">
+                {escaped_json}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             
 
     st.stop()
