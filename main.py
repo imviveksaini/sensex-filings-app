@@ -88,6 +88,16 @@ if "page" not in st.session_state:
 theme = "Dark"
 st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 
+# ↓ Add this to inject custom CSS for smaller font size in st.code()
+st.markdown("""
+    <style>
+        .stCode {
+            font-size: 10px !important;
+            font-family: monospace !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # Landing Page
 if st.session_state.page == "landing":
     st.markdown("""
