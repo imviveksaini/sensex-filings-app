@@ -173,16 +173,22 @@ if st.session_state.page == "landing":
             #st.code(st.session_state["summary_result"], language="json")
             json_text = st.session_state["summary_result"]
 
+            # Replace tabs with 4 spaces (you can adjust)
+            json_text = json_text.replace('\t', '    ')
+            
+            # Escape HTML special chars so indentation is preserved and no HTML issues
+            json_text = html.escape(json_text)
+            
             st.markdown(
                 f"""
                 <pre style="
-                    font-size: 0.7rem;          /* smaller font size */
-                    white-space: pre-wrap;      /* allow wrapping */
-                    word-wrap: break-word;      /* break long words if needed */
+                    font-size: 0.7rem;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
                     font-family: monospace;
                     line-height: 1.3;
-                    background-color: #000;     /* black background */
-                    color: #0f0;                /* green text for better contrast */
+                    background-color: #000;
+                    color: #0f0;
                     padding: 1em;
                     border-radius: 6px;
                     overflow-x: auto;
