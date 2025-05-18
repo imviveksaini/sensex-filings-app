@@ -9,6 +9,7 @@ import streamlit as st
 from bs4 import BeautifulSoup
 import tempfile
 import whisper
+import traceback
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -236,7 +237,8 @@ def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
             result = model.transcribe(tmp_file.name)
             return result["text"]
     except Exception as e:
-        print(f"❌ Transcription failed: {e}")
+        print("❌ Transcription failed:")
+        traceback.print_exc()
         return None
 
 
