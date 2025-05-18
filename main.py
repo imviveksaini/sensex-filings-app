@@ -5,6 +5,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
+import re
 
 from data_loader import update_filings_data
 from data_loader import load_filtered_data
@@ -41,6 +42,11 @@ def format_transcript(text: str) -> str:
     sentences = re.split(r'(?<=[.?!])\s+', text.strip())
     # Join sentences with newlines
     return "\n".join(sentence.strip() for sentence in sentences if sentence.strip())
+
+def add_newline_after_fullstop(text):
+    # Add newline after full stop followed by a space and a capital letter (likely start of new sentence)
+    return re.sub(r'\.\s+(?=[A-Z])', '.\n', text)
+
 
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
 
@@ -231,7 +237,8 @@ if st.session_state.get("summary_result"):
     show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary", key="checkbox_detail")
     if show_extracted_text:
         #formatted_text = format_output_text(st.session_state["extracted_text"], line_length=80)
-        formatted_text = format_transcript(st.session_state["extracted_text"])
+        #formatted_text = format_transcript(st.session_state["extracted_text"])
+        formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
         st.markdown(
             f"""
             <pre style="
