@@ -47,26 +47,36 @@ if st.session_state.page == "landing":
         st.rerun()
 
     st.markdown("---")
-    st.subheader("🎁 Bonus: Filing Summary from URL")
+    st.subheader("🎁 Bonus: Filing Summary from URL or Upload")
+
     with st.form("bonus_form"):
-        pdf_url_input = st.text_input("Paste the PDF/html URL here:")
+        pdf_url_input = st.text_input("Paste the PDF/HTML URL here:")
+        uploaded_file = st.file_uploader("Or upload a PDF file", type=["pdf"])
         bonus_magic_key = st.text_input("Enter Magic Key", type="password")
         doc_type = st.selectbox("Select document type:", options=[
             "general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"
         ], index=0)
         submit_summary = st.form_submit_button("Generate Summary")
-
+    
     if submit_summary:
         if bonus_magic_key == magic_key_actual:
             with st.spinner("Processing summary..."):
-                summary_result, extracted_text = summarize_filing_from_url(pdf_url_input, doc_type)
-                st.session_state["summary_result"] = summary_result
-                st.session_state["extracted_text"] = extracted_text
-                st.session_state["scroll_to_summary_form"] = True
-                st.rerun()
+                file_bytes = uploaded_file.read() if uploaded_file else None
+                summary_result, extracted_text = summarize_filing(
+                    url=pdf_url_input if not file_bytes else None,
+                    file=file_bytes,
+                    doc_type=doc_type
+                )
+                if summary_result:
+                    st.session_state["summary_result"] = summary_result
+                    st.session_state["extracted_text"] = extracted_text
+                    st.session_state["scroll_to_summary_form"] = True
+                    st.rerun()
+                else:
+                    st.error(extracted_text)  # error message returned in place of summary
         else:
             st.error("❌ Incorrect Magic Key. Access denied.")
-
+    
     if "summary_result" in st.session_state and "extracted_text" in st.session_state:
         show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary")
         if show_extracted_text:
