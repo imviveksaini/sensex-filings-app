@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 import re
+import html
 
 from data_loader import update_filings_data
 from data_loader import load_filtered_data
