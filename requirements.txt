@@ -8,7 +8,6 @@ yfinance
 plotly
 feedparser
 lxml
-torch
 sentencepiece
 openai
 zenrows
