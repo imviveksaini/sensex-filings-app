@@ -92,7 +92,7 @@ st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 st.markdown("""
     <style>
         .stCode {
-            font-size: 10px !important;
+            font-size: 5px !important;
             font-family: monospace !important;
         }
     </style>
