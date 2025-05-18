@@ -208,35 +208,60 @@ Filing text:
         print(f"GPT API call failed: {e}")
         return None
 
-def summarize_filing_from_url(url: str, doc_type: str = "general") -> tuple[str, str] | None:
-    content_type, content = download_url(url)
-    if not content:
-        return None, "❌ Failed to download content."
+def summarize_filing(
+    url: str | None = None,
+    file: bytes | None = None,
+    doc_type: str = "general"
+) -> tuple[str, str] | None:
+    """
+    Summarizes a financial document from a given URL or uploaded PDF file using GPT.
 
-    # Determine parser
-    if url.lower().endswith(".pdf") or "application/pdf" in content_type:
-        text = extract_text_from_pdf(content)
-    elif "text/html" in content_type or url.lower().endswith(".html"):
-        text = extract_text_from_html(content)
+    Parameters:
+    - url: URL to the document (PDF or HTML)
+    - file: Uploaded PDF file content (as bytes)
+    - doc_type: Type of document for specialized GPT summary
+
+    Returns:
+    - Tuple of (summary, extracted_text) or (None, error_message)
+    """
+
+    if file:
+        # Handle uploaded PDF file
+        text = extract_text_from_pdf(file)
+        source_description = "uploaded file"
+    elif url:
+        content_type, content = download_url(url)
+        if not content:
+            return None, "❌ Failed to download content."
+
+        # Determine parser
+        if url.lower().endswith(".pdf") or "application/pdf" in content_type:
+            text = extract_text_from_pdf(content)
+        elif "text/html" in content_type or url.lower().endswith(".html"):
+            text = extract_text_from_html(content)
+        else:
+            return None, "❌ Unsupported file format or could not determine file type."
+
+        source_description = url
     else:
-        return None, "❌ Unsupported file format or could not determine file type."
+        return None, "❌ No source provided. Provide either a URL or a PDF file."
 
     if not text.strip():
-        return None, "❌ No text could be extracted from the document."
+        return None, f"❌ No text could be extracted from the {source_description}."
 
-    text = text[:80000]  # truncate to stay within token limits
+    text = text[:80000]  # truncate to stay within GPT token limits
 
-    # Select GPT summarizer based on document type
-    if doc_type == "earnings_call_transcript":
-        gpt_response = call_gpt_for_summary_earnings_call(text)
-    elif doc_type == "research_report":
-        gpt_response = call_gpt_for_summary_research_report(text)
-    elif doc_type == "news_story":
-        gpt_response = call_gpt_for_summary_news(text)
-    elif doc_type == "corporate_filing":
-        gpt_response = call_gpt_for_summary_corp_filing(text)
-    else:  # default or "general"
-        gpt_response = call_gpt_for_summary_general(text)
+    # Route to appropriate GPT summarizer
+    summarizers = {
+        "earnings_call_transcript": call_gpt_for_summary_earnings_call,
+        "research_report": call_gpt_for_summary_research_report,
+        "news_story": call_gpt_for_summary_news,
+        "corporate_filing": call_gpt_for_summary_corp_filing,
+        "general": call_gpt_for_summary_general
+    }
+
+    summarizer = summarizers.get(doc_type, call_gpt_for_summary_general)
+    gpt_response = summarizer(text)
 
     if not gpt_response:
         return None, "❌ Failed to get GPT summary."
