@@ -28,29 +28,53 @@ def log(msg):
 
 
 
-def format_text_with_linebreaks(text):
-    # Insert newlines after punctuation followed by a capital letter
+# def format_text_with_linebreaks(text):
+#     # Insert newlines after punctuation followed by a capital letter
+#     text = re.sub(r'(?<=[.?!])\s+(?=[A-Z])', r'\n', text)
+#     return text  # Do NOT replace \n with <br> here
+
+# def color_lines_by_ending(text):
+#     lines = text.strip().split('\n')  # split on \n here
+#     html_lines = []
+
+#     for line in lines:
+#         line = line.strip()
+#         if not line:
+#             continue
+#         if line.endswith('.'):
+#             colored_line = f'<span style="color: green;">{line}</span>'
+#         elif line.endswith('?'):
+#             colored_line = f'<span style="color: red;">{line}</span>'
+#         else:
+#             colored_line = f'<span>{line}</span>'
+#         html_lines.append(colored_line)
+
+#     # Replace \n with <br> AFTER coloring
+#     return "<br>".join(html_lines)
+
+def format_text_to_sentences(text):
+    # Insert newlines after punctuation followed by a capital letter to split sentences
     text = re.sub(r'(?<=[.?!])\s+(?=[A-Z])', r'\n', text)
-    return text  # Do NOT replace \n with <br> here
+    return text
 
-def color_lines_by_ending(text):
-    lines = text.strip().split('\n')  # split on \n here
-    html_lines = []
+def color_sentences(text):
+    sentences = text.strip().split('\n')  # split on newline
+    html_sentences = []
 
-    for line in lines:
-        line = line.strip()
-        if not line:
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
             continue
-        if line.endswith('.'):
-            colored_line = f'<span style="color: green;">{line}</span>'
-        elif line.endswith('?'):
-            colored_line = f'<span style="color: red;">{line}</span>'
+        if sentence.endswith('.'):
+            color = "green"
+        elif sentence.endswith('?'):
+            color = "red"
         else:
-            colored_line = f'<span>{line}</span>'
-        html_lines.append(colored_line)
+            color = "white"
+        # Wrap each sentence in a div/span with color; no manual <br> inside sentence
+        html_sentences.append(f'<div style="color: {color}; margin-bottom: 0.5em;">{sentence}</div>')
 
-    # Replace \n with <br> AFTER coloring
-    return "<br>".join(html_lines)
+    return "".join(html_sentences)
 
 
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
@@ -109,14 +133,34 @@ if st.session_state.page == "landing":
         show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary")
         if show_extracted_text:
             #st.code(st.session_state["extracted_text"], language="markdown")
-            formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
-            formatted_html = color_lines_by_ending(formatted_text)
+            # formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
+            # formatted_html = color_lines_by_ending(formatted_text)
+            
+            # st.markdown(
+            #     f"""
+            #     <div style="
+            #         font-size: 0.5rem;
+            #         white-space: pre-wrap;
+            #         word-wrap: break-word;
+            #         font-family: monospace;
+            #         line-height: 1.4;
+            #         border: 1px solid #ddd;
+            #         border-radius: 6px;
+            #         padding: 1em;
+            #         background-color: #000000;
+            #         overflow-x: auto;
+            #     ">{formatted_html}</div>
+            #     """,
+            #     unsafe_allow_html=True
+            # )
+
+            formatted_text = format_text_to_sentences(st.session_state["extracted_text"])
+            formatted_html = color_sentences(formatted_text)
             
             st.markdown(
                 f"""
                 <div style="
                     font-size: 0.5rem;
-                    white-space: pre-wrap;
                     word-wrap: break-word;
                     font-family: monospace;
                     line-height: 1.4;
@@ -125,7 +169,10 @@ if st.session_state.page == "landing":
                     padding: 1em;
                     background-color: #000000;
                     overflow-x: auto;
-                ">{formatted_html}</div>
+                    white-space: normal;  /* Allow natural wrapping */
+                ">
+                {formatted_html}
+                </div>
                 """,
                 unsafe_allow_html=True
             )
