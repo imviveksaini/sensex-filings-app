@@ -81,7 +81,11 @@ if "page" not in st.session_state:
     st.session_state.page = "landing"
 
 # Theme Selection
-theme = st.sidebar.radio("🌗 Select Theme", ("Light", "Dark"))
+#theme = st.sidebar.radio("🌗 Select Theme", ("Light", "Dark"))
+#st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
+
+# Hardcode theme
+theme = "Dark"
 st.markdown(apply_custom_styles(theme), unsafe_allow_html=True)
 
 # Landing Page
