@@ -43,9 +43,12 @@ def format_transcript(text: str) -> str:
     # Join sentences with newlines
     return "\n".join(sentence.strip() for sentence in sentences if sentence.strip())
 
+
+
 def add_newline_after_fullstop(text):
-    # Add newline after full stop followed by a space and a capital letter (likely start of new sentence)
-    return re.sub(r'\.\s+(?=[A-Z])', '.\n', text)
+    # Add newline after full stop followed by a space and capital letter (start of new sentence)
+    return re.sub(r'(?<=[.])\s+(?=[A-Z])', r'\n', text)
+
 
 
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
@@ -238,12 +241,14 @@ if st.session_state.get("summary_result"):
     if show_extracted_text:
         #formatted_text = format_output_text(st.session_state["extracted_text"], line_length=80)
         #formatted_text = format_transcript(st.session_state["extracted_text"])
-        formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
+        #formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
         #st.code(formatted_text, language="markdown")
+        formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
+
         st.markdown(
             f"""
             <pre style="
-                font-size: 0.8rem;
+                font-size: 0.6rem;
                 white-space: pre-wrap;
                 word-wrap: break-word;
                 font-family: monospace;
@@ -257,7 +262,6 @@ if st.session_state.get("summary_result"):
             """,
             unsafe_allow_html=True
         )
-        #st.code(st.session_state["extracted_text"], language="markdown")
     else:
         st.code(st.session_state["summary_result"], language="json")
 
