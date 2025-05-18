@@ -35,7 +35,23 @@ def format_text_with_linebreaks(text):
     text = text.replace("\n", "<br>")
     return text
 
+def color_lines_by_ending(text):
+    lines = re.split(r'(?<=[.?\n])\s+', text.strip())
+    html_lines = []
 
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.endswith('.'):
+            colored_line = f'<span style="color: green;">{line}</span>'
+        elif line.endswith('?'):
+            colored_line = f'<span style="color: red;">{line}</span>'
+        else:
+            colored_line = f'<span>{line}</span>'
+        html_lines.append(colored_line)
+
+    return "<br>".join(html_lines)
 
 
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
@@ -95,26 +111,43 @@ if st.session_state.page == "landing":
         if show_extracted_text:
             #st.code(st.session_state["extracted_text"], language="markdown")
             formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
-
+            formatted_html = color_lines_by_ending(formatted_text)
+            # st.markdown(
+            #     f"""
+            #     <div style="
+            #         width: 100%;
+            #         max-width: 100%;
+            #         font-size: 0.5rem;
+            #         white-space: pre-wrap;
+            #         word-wrap: break-word;
+            #         font-family: monospace;
+            #         line-height: 1.6;
+            #         border: 1px solid #ddd;
+            #         border-radius: 6px;
+            #         padding: 1em;
+            #         background-color: #f8f8f8;
+            #         overflow-x: auto;
+            #         box-sizing: border-box;
+            #     ">
+            #         {formatted_text}
+            #     </div>
+            #     """,
+            #     unsafe_allow_html=True
+            # )
             st.markdown(
                 f"""
                 <div style="
-                    width: 100%;
-                    max-width: 100%;
                     font-size: 0.5rem;
                     white-space: pre-wrap;
                     word-wrap: break-word;
                     font-family: monospace;
-                    line-height: 1.6;
+                    line-height: 1.4;
                     border: 1px solid #ddd;
                     border-radius: 6px;
                     padding: 1em;
-                    background-color: #f8f8f8;
+                    background-color: #000000;
                     overflow-x: auto;
-                    box-sizing: border-box;
-                ">
-                    {formatted_text}
-                </div>
+                ">{formatted_html}</div>
                 """,
                 unsafe_allow_html=True
             )
