@@ -29,49 +29,49 @@ def log(msg):
 
 
 
-# def format_text_with_linebreaks(text):
-#     # Insert newlines after punctuation followed by a capital letter
-#     text = re.sub(r'(?<=[.?!])\s+(?=[A-Z])', r'\n', text)
-#     return text  # Do NOT replace \n with <br> here
+def format_text_with_linebreaks(text):
+    # Insert newlines after punctuation followed by a capital letter
+    text = re.sub(r'(?<=[.?!])\s+(?=[A-Z])', r'\n', text)
+    return text  # Do NOT replace \n with <br> here
 
-# def color_lines_by_ending(text):
-#     lines = text.strip().split('\n')  # split on \n here
-#     html_lines = []
+def color_lines_by_ending(text):
+    lines = text.strip().split('\n')  # split on \n here
+    html_lines = []
 
-#     for line in lines:
-#         line = line.strip()
-#         if not line:
-#             continue
-#         if line.endswith('.'):
-#             colored_line = f'<span style="color: green;">{line}</span>'
-#         elif line.endswith('?'):
-#             colored_line = f'<span style="color: red;">{line}</span>'
-#         else:
-#             colored_line = f'<span>{line}</span>'
-#         html_lines.append(colored_line)
-
-#     # Replace \n with <br> AFTER coloring
-#     return "<br>".join(html_lines)
-
-def format_text_color_inline(text):
-    import re
-
-    # Split sentences (end with ., ?, !)
-    sentences = re.findall(r'[^.?!]+[.?!]', text.strip(), re.DOTALL)
-
-    html_sentences = []
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if sentence.endswith('.'):
-            color = 'green'
-        elif sentence.endswith('?'):
-            color = 'red'
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.endswith('.'):
+            colored_line = f'<span style="color: green;">{line}</span>'
+        elif line.endswith('?'):
+            colored_line = f'<span style="color: red;">{line}</span>'
         else:
-            color = 'white'
-        html_sentences.append(f'<span style="color: {color};">{sentence}</span>')
+            colored_line = f'<span>{line}</span>'
+        html_lines.append(colored_line)
 
-    # Join with space — no forced line breaks
-    return " ".join(html_sentences)
+    # Replace \n with <br> AFTER coloring
+    return "<br>".join(html_lines)
+
+# def format_text_color_inline(text):
+#     import re
+
+#     # Split sentences (end with ., ?, !)
+#     sentences = re.findall(r'[^.?!]+[.?!]', text.strip(), re.DOTALL)
+
+#     html_sentences = []
+#     for sentence in sentences:
+#         sentence = sentence.strip()
+#         if sentence.endswith('.'):
+#             color = 'green'
+#         elif sentence.endswith('?'):
+#             color = 'red'
+#         else:
+#             color = 'white'
+#         html_sentences.append(f'<span style="color: {color};">{sentence}</span>')
+
+#     # Join with space — no forced line breaks
+#     return " ".join(html_sentences)
 
 
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
@@ -130,34 +130,14 @@ if st.session_state.page == "landing":
         show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary")
         if show_extracted_text:
             #st.code(st.session_state["extracted_text"], language="markdown")
-            # formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
-            # formatted_html = color_lines_by_ending(formatted_text)
+            formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
+            formatted_html = color_lines_by_ending(formatted_text)
             
-            # st.markdown(
-            #     f"""
-            #     <div style="
-            #         font-size: 0.5rem;
-            #         white-space: pre-wrap;
-            #         word-wrap: break-word;
-            #         font-family: monospace;
-            #         line-height: 1.4;
-            #         border: 1px solid #ddd;
-            #         border-radius: 6px;
-            #         padding: 1em;
-            #         background-color: #000000;
-            #         overflow-x: auto;
-            #     ">{formatted_html}</div>
-            #     """,
-            #     unsafe_allow_html=True
-            # )
-
-            formatted_html = format_text_color_inline(st.session_state["extracted_text"])
-
             st.markdown(
                 f"""
                 <div style="
-                    font-size: 0.5rem;
-                    white-space: normal;
+                    font-size: 0.6rem;
+                    white-space: pre-wrap;
                     word-wrap: break-word;
                     font-family: monospace;
                     line-height: 1.4;
@@ -170,33 +150,28 @@ if st.session_state.page == "landing":
                 """,
                 unsafe_allow_html=True
             )
-        else:
-            #st.code(st.session_state["summary_result"], language="json")
-            json_text = st.session_state["summary_result"]
 
-            # Replace tabs with 4 spaces (you can adjust)
-            json_text = json_text.replace('\t', '    ')
+            # formatted_html = format_text_color_inline(st.session_state["extracted_text"])
+            # st.markdown(
+            #     f"""
+            #     <div style="
+            #         font-size: 0.5rem;
+            #         white-space: normal;
+            #         word-wrap: break-word;
+            #         font-family: monospace;
+            #         line-height: 1.4;
+            #         border: 1px solid #ddd;
+            #         border-radius: 6px;
+            #         padding: 1em;
+            #         background-color: #000000;
+            #         overflow-x: auto;
+            #     ">{formatted_html}</div>
+            #     """,
+            #     unsafe_allow_html=True
+            # )
+        else:
+            st.code(st.session_state["summary_result"], language="json")
             
-            # Escape HTML special chars so indentation is preserved and no HTML issues
-            json_text = html.escape(json_text)
-            
-            st.markdown(
-                f"""
-                <pre style="
-                    font-size: 0.7rem;
-                    white-space: pre-wrap;
-                    word-wrap: break-word;
-                    font-family: monospace;
-                    line-height: 1.3;
-                    background-color: #000;
-                    color: #0f0;
-                    padding: 1em;
-                    border-radius: 6px;
-                    overflow-x: auto;
-                ">{json_text}</pre>
-                """,
-                unsafe_allow_html=True
-            )
 
     st.stop()
 
