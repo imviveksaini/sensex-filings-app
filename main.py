@@ -36,7 +36,7 @@ def format_text_with_linebreaks(text):
     return text
 
 def color_lines_by_ending(text):
-    lines = re.split(r'(?<=[.?\n])\s+', text.strip())
+    lines = text.strip().split('\n')  # split only on newlines
     html_lines = []
 
     for line in lines:
