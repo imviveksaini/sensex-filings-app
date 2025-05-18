@@ -189,7 +189,7 @@ if st.session_state.page == "landing":
 
             st.markdown(
                 f"""
-                <div style="font-size: 5px; font-family: monospace; white-space: pre;">
+                <div style="font-size: 12px; font-family: monospace; white-space: pre-wrap;">
                 {escaped_json}
                 </div>
                 """,
