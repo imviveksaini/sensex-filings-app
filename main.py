@@ -25,7 +25,7 @@ log_msgs = []
 def log(msg):
     log_msgs.append(str(msg))
 
-def format_output_text(text: str, line_length: int = 100) -> str:
+def format_output_text(text: str, line_length: int = 80) -> str:
     """
     Inserts line breaks every `line_length` characters for better display.
     """
@@ -220,9 +220,28 @@ if submit_summary:
 if st.session_state.get("summary_result"):
     show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary", key="checkbox_detail")
     if show_extracted_text:
-        formatted_text = format_output_text(st.session_state["extracted_text"], line_length=100)
+        # formatted_text = format_output_text(st.session_state["extracted_text"], line_length=100)
+        # st.markdown(
+        #     f"<div style='font-size: 0.85rem; white-space: pre-wrap; font-family: monospace;'>{formatted_text}</div>",
+        #     unsafe_allow_html=True
+        # )
+        formatted_text = format_output_text(st.session_state["extracted_text"], line_length=80)
+
         st.markdown(
-            f"<div style='font-size: 0.85rem; white-space: pre-wrap; font-family: monospace;'>{formatted_text}</div>",
+            f"""
+            <pre style="
+                font-size: 0.8rem;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                font-family: monospace;
+                line-height: 1.4;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 1em;
+                background-color: #f8f8f8;
+                overflow-x: auto;
+            ">{formatted_text}</pre>
+            """,
             unsafe_allow_html=True
         )
         #st.code(st.session_state["extracted_text"], language="markdown")
