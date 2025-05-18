@@ -60,10 +60,10 @@ if st.session_state.page == "landing":
         st.rerun()
 
     st.markdown("---")
-    st.subheader("🎁 Bonus: Filing Summary from URL or Upload")
+    st.subheader("🎁 Bonus: Filing Summary from text/audio files")
 
     with st.form("bonus_form"):
-        pdf_url_input = st.text_input("Paste the PDF/HTML URL here:")
+        pdf_url_input = st.text_input("Paste the .pdf/.html/.mp3 URL here:")
         uploaded_file = st.file_uploader("Or upload a PDF file", type=["pdf"])
         bonus_magic_key = st.text_input("Enter Magic Key", type="password")
         doc_type = st.selectbox("Select document type:", options=[
