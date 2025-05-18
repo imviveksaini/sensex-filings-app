@@ -239,6 +239,7 @@ if st.session_state.get("summary_result"):
         #formatted_text = format_output_text(st.session_state["extracted_text"], line_length=80)
         #formatted_text = format_transcript(st.session_state["extracted_text"])
         formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
+        #st.code(formatted_text, language="markdown")
         st.markdown(
             f"""
             <pre style="
