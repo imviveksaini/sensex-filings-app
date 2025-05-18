@@ -45,9 +45,13 @@ def format_transcript(text: str) -> str:
 
 
 
-def add_newline_after_fullstop(text):
-    # Add newline after full stop followed by a space and capital letter (start of new sentence)
-    return re.sub(r'(?<=[.])\s+(?=[A-Z])', r'\n', text)
+def format_text_with_linebreaks(text):
+    # Insert newlines after full stops followed by a space and a capital letter
+    text = re.sub(r'(?<=[.?!])\s+(?=[A-Z])', r'\n', text)
+    # Replace \n with <br> for HTML rendering
+    text = text.replace("\n", "<br>")
+    return text
+
 
 
 
@@ -243,22 +247,22 @@ if st.session_state.get("summary_result"):
         #formatted_text = format_transcript(st.session_state["extracted_text"])
         #formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
         #st.code(formatted_text, language="markdown")
-        formatted_text = add_newline_after_fullstop(st.session_state["extracted_text"])
+        formatted_text = format_text_with_linebreaks(st.session_state["extracted_text"])
 
         st.markdown(
             f"""
-            <pre style="
-                font-size: 0.6rem;
-                white-space: pre-wrap;
+            <div style="
+                font-size: 0.8rem;
+                white-space: normal;
                 word-wrap: break-word;
                 font-family: monospace;
-                line-height: 1.4;
+                line-height: 1.6;
                 border: 1px solid #ddd;
                 border-radius: 6px;
                 padding: 1em;
                 background-color: #f8f8f8;
                 overflow-x: auto;
-            ">{formatted_text}</pre>
+            ">{formatted_text}</div>
             """,
             unsafe_allow_html=True
         )
