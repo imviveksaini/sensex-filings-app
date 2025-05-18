@@ -17,7 +17,7 @@ from valuation_metrics import show_valuation_metrics
 from shareholding_pattern import show_shareholding_pattern
 from bse_insider_trades import show_bse_insider_trades
 from nse_bulk_block_short import show_nse_bulk_block_short_deals
-from bonus_summary import summarize_filing_from_url
+from bonus_summary import summarize_filing
 
 magic_key_actual = st.secrets.get("MAGIC_KEY", os.getenv("MAGIC_KEY"))
 log_msgs = []
