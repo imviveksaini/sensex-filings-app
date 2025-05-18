@@ -26,23 +26,6 @@ log_msgs = []
 def log(msg):
     log_msgs.append(str(msg))
 
-def format_output_text(text: str, line_length: int = 80) -> str:
-    """
-    Inserts line breaks every `line_length` characters for better display.
-    """
-    import textwrap
-    return "\n".join(textwrap.wrap(text, width=line_length))
-
-def format_transcript(text: str) -> str:
-    """
-    Splits text at sentence-ending punctuation marks (., ?, !) and inserts new lines.
-    Keeps punctuation with sentences.
-    """
-    # Use regex to split after punctuation followed by space(s)
-    sentences = re.split(r'(?<=[.?!])\s+', text.strip())
-    # Join sentences with newlines
-    return "\n".join(sentence.strip() for sentence in sentences if sentence.strip())
-
 
 
 def format_text_with_linebreaks(text):
@@ -252,8 +235,10 @@ if st.session_state.get("summary_result"):
         st.markdown(
             f"""
             <div style="
-                font-size: 0.8rem;
-                white-space: normal;
+                width: 100%;
+                max-width: 100%;
+                font-size: 0.5rem;
+                white-space: pre-wrap;
                 word-wrap: break-word;
                 font-family: monospace;
                 line-height: 1.6;
@@ -262,7 +247,10 @@ if st.session_state.get("summary_result"):
                 padding: 1em;
                 background-color: #f8f8f8;
                 overflow-x: auto;
-            ">{formatted_text}</div>
+                box-sizing: border-box;
+            ">
+                {formatted_text}
+            </div>
             """,
             unsafe_allow_html=True
         )
