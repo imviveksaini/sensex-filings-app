@@ -43,7 +43,7 @@ def color_lines_by_ending(text):
         if not line:
             continue
         if line.endswith('.'):
-            colored_line = f'<span style="color: green;">{line}</span>'
+            colored_line = f'<span style="color: white;">{line}</span>'
         elif line.endswith('?'):
             colored_line = f'<span style="color: red;">{line}</span>'
         else:
