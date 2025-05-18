@@ -170,7 +170,26 @@ if st.session_state.page == "landing":
                 unsafe_allow_html=True
             )
         else:
-            st.code(st.session_state["summary_result"], language="json")
+            #st.code(st.session_state["summary_result"], language="json")
+            json_text = st.session_state["summary_result"]
+
+            st.markdown(
+                f"""
+                <pre style="
+                    font-size: 0.7rem;          /* smaller font size */
+                    white-space: pre-wrap;      /* allow wrapping */
+                    word-wrap: break-word;      /* break long words if needed */
+                    font-family: monospace;
+                    line-height: 1.3;
+                    background-color: #000;     /* black background */
+                    color: #0f0;                /* green text for better contrast */
+                    padding: 1em;
+                    border-radius: 6px;
+                    overflow-x: auto;
+                ">{json_text}</pre>
+                """,
+                unsafe_allow_html=True
+            )
 
     st.stop()
 
