@@ -32,6 +32,16 @@ def format_output_text(text: str, line_length: int = 80) -> str:
     import textwrap
     return "\n".join(textwrap.wrap(text, width=line_length))
 
+def format_transcript(text: str) -> str:
+    """
+    Splits text at sentence-ending punctuation marks (., ?, !) and inserts new lines.
+    Keeps punctuation with sentences.
+    """
+    # Use regex to split after punctuation followed by space(s)
+    sentences = re.split(r'(?<=[.?!])\s+', text.strip())
+    # Join sentences with newlines
+    return "\n".join(sentence.strip() for sentence in sentences if sentence.strip())
+
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
 
 # Page State
@@ -220,13 +230,8 @@ if submit_summary:
 if st.session_state.get("summary_result"):
     show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary", key="checkbox_detail")
     if show_extracted_text:
-        # formatted_text = format_output_text(st.session_state["extracted_text"], line_length=100)
-        # st.markdown(
-        #     f"<div style='font-size: 0.85rem; white-space: pre-wrap; font-family: monospace;'>{formatted_text}</div>",
-        #     unsafe_allow_html=True
-        # )
-        formatted_text = format_output_text(st.session_state["extracted_text"], line_length=80)
-
+        #formatted_text = format_output_text(st.session_state["extracted_text"], line_length=80)
+        formatted_text = format_transcript(st.session_state["extracted_text"])
         st.markdown(
             f"""
             <pre style="
