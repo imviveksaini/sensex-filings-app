@@ -25,6 +25,13 @@ log_msgs = []
 def log(msg):
     log_msgs.append(str(msg))
 
+def format_output_text(text: str, line_length: int = 100) -> str:
+    """
+    Inserts line breaks every `line_length` characters for better display.
+    """
+    import textwrap
+    return "\n".join(textwrap.wrap(text, width=line_length))
+
 st.set_page_config(page_title="SENSEX Filings Viewer", layout="wide", initial_sidebar_state="expanded")
 
 # Page State
@@ -213,7 +220,12 @@ if submit_summary:
 if st.session_state.get("summary_result"):
     show_extracted_text = st.checkbox("🔍 Show Extracted Text Instead of Summary", key="checkbox_detail")
     if show_extracted_text:
-        st.code(st.session_state["extracted_text"], language="markdown")
+        formatted_text = format_output_text(st.session_state["extracted_text"], line_length=100)
+        st.markdown(
+            f"<div style='font-size: 0.85rem; white-space: pre-wrap; font-family: monospace;'>{formatted_text}</div>",
+            unsafe_allow_html=True
+        )
+        #st.code(st.session_state["extracted_text"], language="markdown")
     else:
         st.code(st.session_state["summary_result"], language="json")
 
