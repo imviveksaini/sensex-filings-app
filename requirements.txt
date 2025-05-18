@@ -14,5 +14,3 @@ openai
 zenrows
 openai-whisper
 torch
-ffmpeg-python
-ffmpeg
