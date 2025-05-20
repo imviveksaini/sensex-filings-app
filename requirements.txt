@@ -11,6 +11,6 @@ lxml
 sentencepiece
 openai
 zenrows
-torch
-openai-whisper
+torch==2.1.0
+openai-whisper==20231117
 
