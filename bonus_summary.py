@@ -11,6 +11,11 @@ import tempfile
 import whisper
 import traceback
 
+
+@st.cache_resource
+def load_whisper_model():
+    return whisper.load_model("base")  # or "small", etc.
+
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def download_url(url: str) -> tuple[str, bytes | None]:
@@ -214,16 +219,36 @@ Filing text:
 
 
 
-def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
-    """
-    Downloads and transcribes an MP3 audio file using a local Whisper model.
+# def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
+#     """
+#     Downloads and transcribes an MP3 audio file using a local Whisper model.
     
-    Parameters:
-    - mp3_url (str): Direct URL to the MP3 file.
+#     Parameters:
+#     - mp3_url (str): Direct URL to the MP3 file.
 
-    Returns:
-    - Transcript (str) or None on failure.
-    """
+#     Returns:
+#     - Transcript (str) or None on failure.
+#     """
+#     try:
+#         response = requests.get(mp3_url, stream=True)
+#         response.raise_for_status()
+
+#         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=True) as tmp_file:
+#             for chunk in response.iter_content(chunk_size=8192):
+#                 tmp_file.write(chunk)
+#             tmp_file.flush()
+
+#             model = whisper.load_model("base")  # you can change to "small", "medium", or "large"
+#             result = model.transcribe(tmp_file.name)
+#             return result["text"]
+#     except Exception as e:
+#         print("❌ Transcription failed:")
+#         traceback.print_exc()
+#         return None
+
+
+
+def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
     try:
         response = requests.get(mp3_url, stream=True)
         response.raise_for_status()
@@ -233,15 +258,13 @@ def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
                 tmp_file.write(chunk)
             tmp_file.flush()
 
-            model = whisper.load_model("base")  # you can change to "small", "medium", or "large"
+            model = load_whisper_model()
             result = model.transcribe(tmp_file.name)
             return result["text"]
     except Exception as e:
         print("❌ Transcription failed:")
         traceback.print_exc()
         return None
-
-
 
 def summarize_filing(
     url: str | None = None,
