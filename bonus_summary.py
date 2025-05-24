@@ -394,6 +394,14 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
 
         # Concatenate transcripts
         final_transcript = " ".join([t for t in transcripts if t is not None])
+
+        # --- COST CALCULATION & DISPLAY ---
+        WHISPER_API_COST_PER_MINUTE = 0.006 # As of my last update, check OpenAI for current pricing       
+        # Convert total duration from milliseconds to minutes
+        total_audio_duration_minutes = total_audio_duration_ms / (1000 * 60)       
+        estimated_cost = total_audio_duration_minutes * WHISPER_API_COST_PER_MINUTE        
+        st.success(f"Estimated cost: **${estimated_cost:.4f}** (based on {total_audio_duration_minutes:.2f} minutes of audio @ ${WHISPER_API_COST_PER_MINUTE}/min).")
+        
         return final_transcript.strip()
 
     except Exception as e:
