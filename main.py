@@ -216,7 +216,7 @@ if st.session_state.page == "landing":
                 # Assuming bonus_magic_key is obtained elsewhere, possibly a Streamlit secret or input
                 # For demonstration, let's assume it's available or set a dummy.
                 # bonus_magic_key = st.text_input("Enter bonus magic key (for demo)", type="password") # Example if it's input
-                bonus_magic_key = "your_secret_magic_key" # Replace with how you actually get it
+                #bonus_magic_key = "your_secret_magic_key" # Replace with how you actually get it
         
                 if bonus_magic_key == magic_key_actual:
                     if st.session_state["extracted_text"]:
