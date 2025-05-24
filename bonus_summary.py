@@ -50,7 +50,7 @@ def extract_text_from_html(html_bytes: bytes) -> str:
         print(f"Text extraction error (HTML): {e}")
         return ""
 
-def call_gpt_for_summary_corp_filing(raw_input_text: str) -> dict | None:
+def call_gpt_for_summary_corp_filing(raw_input_text: str, gpt_model: str) -> dict | None:
     try:
         my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         client = OpenAI(api_key=my_api_key)
@@ -83,7 +83,7 @@ Filing text:
         return None
 
 
-def call_gpt_for_summary_earnings_call(raw_input_text: str) -> dict | None:
+def call_gpt_for_summary_earnings_call(raw_input_text: str, gpt_model: str) -> dict | None:
     try:
         my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         client = OpenAI(api_key=my_api_key)
@@ -122,7 +122,7 @@ Filing text:
         return None
 
 
-def call_gpt_for_summary_research_report(raw_input_text: str) -> dict | None:
+def call_gpt_for_summary_research_report(raw_input_text: str, gpt_model: str) -> dict | None:
     try:
         my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         client = OpenAI(api_key=my_api_key)
@@ -155,7 +155,7 @@ Filing text:
         print(f"GPT API call failed: {e}")
         return None
 
-def call_gpt_for_summary_news(raw_input_text: str) -> dict | None:
+def call_gpt_for_summary_news(raw_input_text: str, gpt_model: str) -> dict | None:
     try:
         my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         client = OpenAI(api_key=my_api_key)
