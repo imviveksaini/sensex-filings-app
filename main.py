@@ -119,6 +119,9 @@ if st.session_state.page == "landing":
         doc_type = st.selectbox("Select document type:", options=[
             "general", "news_story", "earnings_call_transcript", "research_report", "corporate_filing"
         ], index=0)
+        gpt_model = st.selectbox("Select gpt model:", options=[
+            "gpt-4.1-nano", "gpt-4.1-mini"
+        ], index=0)
         submit_summary = st.form_submit_button("Generate Summary")
     
     if submit_summary:
@@ -129,7 +132,7 @@ if st.session_state.page == "landing":
                     url=pdf_url_input if not file_bytes else None,
                     file=file_bytes,
                     doc_type=doc_type,
-                    gpt_type="gpt-4.1-nano"
+                    gpt_model=gpt_model
                 )
                 if summary_result:
                     st.session_state["summary_result"] = summary_result
