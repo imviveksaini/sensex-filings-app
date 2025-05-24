@@ -488,10 +488,10 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
         audio_to_process = audio # Default to original audio
         current_processing_path = full_audio_path # Path used for chunking
 
-        ONE_HOUR_MS = 60 * 60 * 1000 # 1 hour in milliseconds
+        ONE_P5HOUR_MS = 90 * 60 * 1000 # 1.5 hour in milliseconds
 
-        if original_audio_duration_ms > ONE_HOUR_MS:
-            st.info("Audio is longer than 1 hour. Attempting to downsample to save memory and improve stability...")
+        if original_audio_duration_ms > ONE_P5HOUR_MS:
+            st.info("Audio is longer than 1.5 hour. Attempting to downsample to save memory and improve stability...")
             
             # Downsample to 16kHz sample rate and mono channel
             # Changing bitrate on export can also help significantly for MP3s
@@ -576,7 +576,7 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
         total_audio_duration_minutes = original_audio_duration_ms / (1000 * 60)
         estimated_cost = total_audio_duration_minutes * WHISPER_API_COST_PER_MINUTE
         
-        st.success(f"Transcription complete! Estimated cost: **${estimated_cost:.4f}** (based on {total_audio_duration_minutes:.2f} minutes of audio @ ${WHISPER_API_COST_PER_MINUTE}/min).")
+        st.success(f"Transcription complete! Estimated cost: ${estimated_cost:.4f} ( based on {total_audio_duration_minutes:.2f} minutes of audio @ ${WHISPER_API_COST_PER_MINUTE}/min).")
         st.info("Please verify the latest pricing on the OpenAI API documentation.")
 
         return final_transcript.strip()
