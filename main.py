@@ -184,28 +184,69 @@ if st.session_state.page == "landing":
             )
 
 
-        with st.form("Ask a question:"):
-            question = st.text_input("Enter a question here:")
-            question_submitted = st.form_submit_button("Submit")
+        # with st.form("Ask a question:"):
+        #     question = st.text_input("Enter a question here:")
+        #     question_submitted = st.form_submit_button("Submit")
+        #     if question_submitted:
+        #         if bonus_magic_key == magic_key_actual:
+        #             with st.spinner("Processing question..."):
+        #                 answer = answer_a_question(
+        #                     raw_input_text=st.session_state["extracted_text"],
+        #                     question=question,
+        #                     gpt_model=gpt_model
+        #                 )
+        #             st.session_state["extracted_answer"] = answer
+        #             #st.code(st.session_state["extracted_answer"], language="markdown")
+        #             escaped_json = html.escape(st.session_state["extracted_answer"])
+        #             st.markdown(
+        #                 f"""
+        #                 <div style="font-size: 12px; font-family: monospace; white-space: pre-wrap;">
+        #                 {escaped_json}
+        #                 </div>
+        #                 """,
+        #                 unsafe_allow_html=True
+        #             )
+
+        ## Ask a Question
+        with st.form("ask_question_form"):
+            question = st.text_input("Enter a question here:", key="question_input")
+            question_submitted = st.form_submit_button("Submit Question")
+        
             if question_submitted:
+                # Assuming bonus_magic_key is obtained elsewhere, possibly a Streamlit secret or input
+                # For demonstration, let's assume it's available or set a dummy.
+                # bonus_magic_key = st.text_input("Enter bonus magic key (for demo)", type="password") # Example if it's input
+                bonus_magic_key = "your_secret_magic_key" # Replace with how you actually get it
+        
                 if bonus_magic_key == magic_key_actual:
-                    with st.spinner("Processing question..."):
-                        answer = answer_a_question(
-                            raw_input_text=st.session_state["extracted_text"],
-                            question=question,
-                            gpt_model=gpt_model
-                        )
-                    st.session_state["extracted_answer"] = answer
-                    #st.code(st.session_state["extracted_answer"], language="markdown")
-                    escaped_json = html.escape(st.session_state["extracted_answer"])
-                    st.markdown(
-                        f"""
-                        <div style="font-size: 12px; font-family: monospace; white-space: pre-wrap;">
-                        {escaped_json}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                    if st.session_state["extracted_text"]:
+                        with st.spinner("Processing question..."):
+                            answer = answer_a_question(
+                                raw_input_text=st.session_state["extracted_text"],
+                                question=question,
+                                gpt_model=gpt_model
+                            )
+                        st.session_state["extracted_answer"] = answer
+                    else:
+                        st.warning("Please process a document first to extract text before asking questions.")
+                else:
+                    st.error("Incorrect magic key.")
+        
+        # Display the answer outside the form so it persists
+        if st.session_state["extracted_answer"]:
+            st.subheader("Answer:")
+            escaped_json = html.escape(st.session_state["extracted_answer"])
+            st.markdown(
+                f"""
+                <div style="font-size: 12px; font-family: monospace; white-space: pre-wrap;">
+                {escaped_json}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        
+        st.write("---")
+        st.write("You can ask another question above.")
             
 
     st.stop()
