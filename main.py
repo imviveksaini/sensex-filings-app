@@ -196,7 +196,16 @@ if st.session_state.page == "landing":
                             gpt_model=gpt_model
                         )
                     st.session_state["extracted_answer"] = answer
-                    st.code(st.session_state["extracted_answer"], language="markdown")
+                    #st.code(st.session_state["extracted_answer"], language="markdown")
+                    escaped_json = html.escape(st.session_state["extracted_answer"])
+                    st.markdown(
+                        f"""
+                        <div style="font-size: 12px; font-family: monospace; white-space: pre-wrap;">
+                        {escaped_json}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
             
 
     st.stop()
