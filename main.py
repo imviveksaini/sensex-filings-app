@@ -128,7 +128,8 @@ if st.session_state.page == "landing":
                 summary_result, extracted_text = summarize_filing(
                     url=pdf_url_input if not file_bytes else None,
                     file=file_bytes,
-                    doc_type=doc_type
+                    doc_type=doc_type,
+                    gpt_type="gpt-4.1-nano"
                 )
                 if summary_result:
                     st.session_state["summary_result"] = summary_result
