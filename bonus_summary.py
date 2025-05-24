@@ -343,6 +343,8 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
         audio = AudioSegment.from_file(full_audio_path)
         chunk_length_ms = chunk_length_min * 60 * 1000 # Convert minutes to milliseconds
         chunks = make_chunks(audio, chunk_length_ms)
+        # Get total audio duration in milliseconds for cost calculation
+        total_audio_duration_ms = len(audio) 
 
         transcripts = [None] * len(chunks)
         temp_chunk_paths = []
