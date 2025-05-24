@@ -209,25 +209,16 @@ if st.session_state.page == "landing":
 
         ## Ask a Question
         with st.form("ask_question_form"):
+            # --- IMPORTANT: Initialize session state variables at the start of your script ---
+            if "extracted_text" not in st.session_state:
+                st.session_state["extracted_text"] = ""
+            if "extracted_answer" not in st.session_state:
+                st.session_state["extracted_answer"] = ""
+    
             question = st.text_input("Enter a question here:", key="question_input")
             question_submitted = st.form_submit_button("Submit Question")
         
-            if question_submitted:
-                # Assuming bonus_magic_key is obtained elsewhere, possibly a Streamlit secret or input
-                # For demonstration, let's assume it's available or set a dummy.
-                # bonus_magic_key = st.text_input("Enter bonus magic key (for demo)", type="password") # Example if it's input
-                #bonus_magic_key = "your_secret_magic_key" # Replace with how you actually get it
-
-                # --- IMPORTANT: Initialize session state variables at the start of your script ---
-                if "extracted_text" not in st.session_state:
-                    st.session_state["extracted_text"] = ""
-                if "extracted_answer" not in st.session_state:
-                    st.session_state["extracted_answer"] = ""
-                # You might also want to initialize gpt_model if it's selected via a UI element
-                if "gpt_model" not in st.session_state:
-                    st.session_state["gpt_model"] = "gpt-4.1-nano" # Default value
-
-        
+            if question_submitted:        
                 if bonus_magic_key == magic_key_actual:
                     if st.session_state["extracted_text"]:
                         with st.spinner("Processing question..."):
