@@ -107,7 +107,7 @@ Respond **only** in valid JSON format with exactly the following keys:
 8. "headwinds": if management talked about any business headwinds that could deter growth in future, write here. Maximum 3 lines, bullet points. Write only when you're very sure.
 9. "management_guidance": Write here if company management provided any revenue growth, margin or eps growth guidance or any other forward looking statements on company prospects. Maximum 3 lines, bullet points.
 10. "bullishness_indicator (-100 to 100)": how bullish are you on this stock for the next 1-3 quarters based on the text output you generated above. 100 = very bullish, -100 = very bearish.
-
+11. "management_tone": Analyze the text for the CEO/CFO's overall tone. Is it optimistic, pessimistic or neutral? write single word.
 
 Filing text:
 {raw_input_text}
