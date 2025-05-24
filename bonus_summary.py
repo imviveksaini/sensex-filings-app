@@ -106,7 +106,7 @@ Respond **only** in valid JSON format with exactly the following keys:
 7. "the bad things reported by management": a brief summary of the bad things/red flags in the business financials from the answers given by management asked by analysts. Maximum 5 lines, bullet points.
 8. "headwinds": if management talked about any business headwinds that could deter growth in future, write here. Maximum 3 lines, bullet points. Write only when you're very sure.
 9. "management_guidance": Write here if company management provided any revenue growth, margin or eps growth guidance or any other forward looking statements on company prospects. Maximum 3 lines, bullet points.
-10. "bullishness_indicator (-100 to 100)": how bullish are you on this stock for the next 1-3 quarters based on the text output you generated above. 100 = very bullish, -100 = very bearish.
+10. "bullishness_indicator (-100 to 100)": how bullish are you on this stock for the next 1-3 quarters based on the text output you generated above. 100 = very bullish, -100 = very bearish. Also, give 2 sentence reasoning.
 11. "management_tone": Analyze the text for the CEO/CFO's overall tone. Is it optimistic, pessimistic or neutral? write single word.
 
 Filing text:
