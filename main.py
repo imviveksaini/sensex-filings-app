@@ -19,7 +19,8 @@ from valuation_metrics import show_valuation_metrics
 from shareholding_pattern import show_shareholding_pattern
 from bse_insider_trades import show_bse_insider_trades
 from nse_bulk_block_short import show_nse_bulk_block_short_deals
-from bonus_summary import summarize_filing
+from bonus_summary import summarize_filing, answer_a_question
+
 
 magic_key_actual = st.secrets.get("MAGIC_KEY", os.getenv("MAGIC_KEY"))
 log_msgs = []
@@ -169,25 +170,7 @@ if st.session_state.page == "landing":
                 unsafe_allow_html=True
             )
 
-            # formatted_html = format_text_color_inline(st.session_state["extracted_text"])
-            # st.markdown(
-            #     f"""
-            #     <div style="
-            #         font-size: 0.5rem;
-            #         white-space: normal;
-            #         word-wrap: break-word;
-            #         font-family: monospace;
-            #         line-height: 1.4;
-            #         border: 1px solid #ddd;
-            #         border-radius: 6px;
-            #         padding: 1em;
-            #         background-color: #000000;
-            #         overflow-x: auto;
-            #     ">{formatted_html}</div>
-            #     """,
-            #     unsafe_allow_html=True
-            # )
-        else:
+        if not show_extracted_text:
             #st.code(st.session_state["summary_result"], language="json")
             escaped_json = html.escape(st.session_state["summary_result"])
 
@@ -199,6 +182,21 @@ if st.session_state.page == "landing":
                 """,
                 unsafe_allow_html=True
             )
+
+
+        with st.form("Ask a question:"):
+        question = st.text_input("Enter a question here:")
+        question_submitted = st.form_submit_button("Submit")
+        if question_submitted:
+            if bonus_magic_key == magic_key_actual:
+                with st.spinner("Processing question..."):
+                    answer = answer_a_question(
+                        extracted_text=extracted_text,
+                        question=question,
+                        gpt_model=gpt_model
+                    )
+                st.session_state["extracted_answer"] = answer
+                st.code(st.session_state["extracted_answer"], language="markdown")
             
 
     st.stop()
