@@ -7,6 +7,14 @@ from openai import OpenAI
 import os
 import streamlit as st
 from bs4 import BeautifulSoup
+import tempfile
+import whisper
+import traceback
+
+
+@st.cache_resource
+def load_whisper_model():
+    return whisper.load_model("base")  # or "small", etc.
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -208,50 +216,104 @@ Filing text:
         print(f"GPT API call failed: {e}")
         return None
 
+
+
+
+# def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
+#     """
+#     Downloads and transcribes an MP3 audio file using a local Whisper model.
+    
+#     Parameters:
+#     - mp3_url (str): Direct URL to the MP3 file.
+
+#     Returns:
+#     - Transcript (str) or None on failure.
+#     """
+#     try:
+#         response = requests.get(mp3_url, stream=True)
+#         response.raise_for_status()
+
+#         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=True) as tmp_file:
+#             for chunk in response.iter_content(chunk_size=8192):
+#                 tmp_file.write(chunk)
+#             tmp_file.flush()
+
+#             model = whisper.load_model("base")  # you can change to "small", "medium", or "large"
+#             result = model.transcribe(tmp_file.name)
+#             return result["text"]
+#     except Exception as e:
+#         print("❌ Transcription failed:")
+#         traceback.print_exc()
+#         return None
+
+
+
+def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
+    try:
+        response = requests.get(mp3_url, stream=True)
+        response.raise_for_status()
+
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=True) as tmp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                tmp_file.write(chunk)
+            tmp_file.flush()
+
+            model = load_whisper_model()
+            result = model.transcribe(tmp_file.name)
+            return result["text"]
+    except Exception as e:
+        print("❌ Transcription failed:")
+        traceback.print_exc()
+        return None
+
 def summarize_filing(
     url: str | None = None,
     file: bytes | None = None,
     doc_type: str = "general"
 ) -> tuple[str, str] | None:
     """
-    Summarizes a financial document from a given URL or uploaded PDF file using GPT.
+    Summarizes a financial document (PDF, HTML, or MP3) from a URL or uploaded file using GPT.
 
     Parameters:
-    - url: URL to the document (PDF or HTML)
+    - url: URL to the document (PDF, HTML, or MP3)
     - file: Uploaded PDF file content (as bytes)
     - doc_type: Type of document for specialized GPT summary
 
     Returns:
     - Tuple of (summary, extracted_text) or (None, error_message)
     """
-
+    
     if file:
-        # Handle uploaded PDF file
         text = extract_text_from_pdf(file)
         source_description = "uploaded file"
+    
     elif url:
-        content_type, content = download_url(url)
-        if not content:
-            return None, "❌ Failed to download content."
-
-        # Determine parser
-        if url.lower().endswith(".pdf") or "application/pdf" in content_type:
-            text = extract_text_from_pdf(content)
-        elif "text/html" in content_type or url.lower().endswith(".html"):
-            text = extract_text_from_html(content)
+        if url.lower().endswith(".mp3"):
+            text = transcribe_audio_from_url_local(url)
+            if not text:
+                return None, "❌ Transcription failed."
+            source_description = "transcribed audio file"
         else:
-            return None, "❌ Unsupported file format or could not determine file type."
+            content_type, content = download_url(url)
+            if not content:
+                return None, "❌ Failed to download content."
 
-        source_description = url
+            if url.lower().endswith(".pdf") or "application/pdf" in content_type:
+                text = extract_text_from_pdf(content)
+            elif "text/html" in content_type or url.lower().endswith(".html"):
+                text = extract_text_from_html(content)
+            else:
+                return None, "❌ Unsupported file format or could not determine file type."
+
+            source_description = url
     else:
-        return None, "❌ No source provided. Provide either a URL or a PDF file."
+        return None, "❌ No source provided. Provide either a URL or a PDF/MP3 file."
 
-    if not text.strip():
+    if not text or not text.strip():
         return None, f"❌ No text could be extracted from the {source_description}."
 
     text = text[:80000]  # truncate to stay within GPT token limits
 
-    # Route to appropriate GPT summarizer
     summarizers = {
         "earnings_call_transcript": call_gpt_for_summary_earnings_call,
         "research_report": call_gpt_for_summary_research_report,
