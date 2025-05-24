@@ -358,9 +358,21 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
                     temp_chunk_paths.append(chunk_path) # Keep track for cleanup
                     future_to_chunk[executor.submit(transcribe_audio_whisper1, chunk_path)] = i
 
-            for future in st.progress(concurrent.futures.as_completed(future_to_chunk),
-                                       text="Transcribing chunks...",
-                                       length=len(chunks)):
+            # --- FIX STARTS HERE ---
+            total_chunks = len(chunks)
+            completed_chunks = 0
+            
+            # Initialize the progress bar outside the loop
+            progress_bar = st.progress(0, text=f"Transcribing {total_chunks} chunks...")
+    
+            for future in concurrent.futures.as_completed(future_to_chunk):
+                completed_chunks += 1
+                # Calculate the progress percentage (0.0 to 1.0)
+                current_progress = completed_chunks / total_chunks
+                
+                # Update the progress bar
+                progress_bar.progress(current_progress, text=f"Transcribing chunk {completed_chunks}/{total_chunks}...")
+    
                 i = future_to_chunk[future]
                 try:
                     transcripts[i] = future.result()
@@ -369,6 +381,12 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
                 except Exception as exc:
                     st.error(f"Chunk {i+1} generated an exception: {exc}")
                     transcripts[i] = "" # Assign empty string to maintain order
+    
+            # Ensure the progress bar reaches 100% at the end
+            progress_bar.progress(1.0, text="All chunks transcribed!")
+
+            # --- FIX ENDS HERE ---
+
 
         # Clean up temporary chunk files
         for path in temp_chunk_paths:
