@@ -215,6 +215,34 @@ Filing text:
         return None
 
 
+def answer_a_question(raw_input_text: str, question: str, gpt_model: str) -> dict | None:
+    try:
+        my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+        client = OpenAI(api_key=my_api_key)
+        user_prompt = f'''
+You're an expert in reading text on Indian stocks and economy.
+
+Answer the following question after reading the entire text:
+Question:
+{question}
+
+Respond **only** in valid JSON format with exactly the following keys:
+1. "answer": Give an answer within 200-500 characters.
+
+Text input:
+{raw_input_text}
+'''
+        response = client.chat.completions.create(
+            model=gpt_model,
+            temperature=0,
+            messages=[{"role": "user", "content": user_prompt}],
+            response_format={"type": "json_object"},
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"GPT API call failed: {e}")
+        return None
+
 
 
 # def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
