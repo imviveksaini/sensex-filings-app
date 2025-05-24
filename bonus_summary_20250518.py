@@ -72,7 +72,7 @@ Filing text:
 {raw_input_text}
 '''
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model=gpt_model,
             temperature=0,
             messages=[{"role": "user", "content": user_prompt}],
             response_format={"type": "json_object"},
@@ -111,7 +111,7 @@ Filing text:
 {raw_input_text}
 '''
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model=gpt_model,
             temperature=0,
             messages=[{"role": "user", "content": user_prompt}],
             response_format={"type": "json_object"},
@@ -145,7 +145,7 @@ Filing text:
 {raw_input_text}
 '''
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model=gpt_model,
             temperature=0,
             messages=[{"role": "user", "content": user_prompt}],
             response_format={"type": "json_object"},
@@ -176,7 +176,7 @@ Filing text:
 {raw_input_text}
 '''
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model=gpt_model,
             temperature=0,
             messages=[{"role": "user", "content": user_prompt}],
             response_format={"type": "json_object"},
@@ -187,7 +187,7 @@ Filing text:
         return None
 
 
-def call_gpt_for_summary_general(raw_input_text: str) -> dict | None:
+def call_gpt_for_summary_general(raw_input_text: str, gpt_model: str) -> dict | None:
     try:
         my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         client = OpenAI(api_key=my_api_key)
@@ -206,7 +206,7 @@ Filing text:
 {raw_input_text}
 '''
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model=gpt_model,
             temperature=0,
             messages=[{"role": "user", "content": user_prompt}],
             response_format={"type": "json_object"},
@@ -269,7 +269,8 @@ def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
 def summarize_filing(
     url: str | None = None,
     file: bytes | None = None,
-    doc_type: str = "general"
+    doc_type: str = "general",
+    gpt_model: str = "gpt-4.1-nano"
 ) -> tuple[str, str] | None:
     """
     Summarizes a financial document (PDF, HTML, or MP3) from a URL or uploaded file using GPT.
@@ -323,7 +324,7 @@ def summarize_filing(
     }
 
     summarizer = summarizers.get(doc_type, call_gpt_for_summary_general)
-    gpt_response = summarizer(text)
+    gpt_response = summarizer(text, gpt_model)
 
     if not gpt_response:
         return None, "❌ Failed to get GPT summary."
