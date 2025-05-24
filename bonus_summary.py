@@ -11,6 +11,10 @@ import tempfile
 import whisper
 import traceback
 
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+import concurrent.futures # For parallel API calls
+
 
 @st.cache_resource
 def load_whisper_model():
@@ -292,6 +296,98 @@ def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
         traceback.print_exc()
         return None
 
+
+def transcribe_audio_whisper1(mp3_path: str) -> str | None:
+    """
+    Transcribes an MP3 audio file using OpenAI Whisper and returns the transcript.
+    
+    Parameters:
+    - mp3_path (str): Path to the .mp3 file
+
+    Returns:
+    - Transcript (str) or None on failure
+    """
+    my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+    try:
+        client = OpenAI(api_key=my_api_key)
+
+        with open(mp3_path, "rb") as audio_file:
+            transcript_response = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="text"
+            )
+        return transcript_response
+    except Exception as e:
+        print(f"Transcription failed: {e}")
+        return None
+
+# --- NEW FUNCTION FOR CHUNKING AND PARALLEL TRANSCRIPTION ---
+def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> str | None:
+    """
+    Downloads large audio, chunks it, transcribes chunks in parallel using Whisper-1 API,
+    and returns the concatenated transcript.
+    """
+    st.info(f"Downloading audio from {mp3_url}...")
+    content_type, audio_bytes = download_url(mp3_url)
+    if not audio_bytes:
+        return None
+
+    # Save the whole file to a temporary location for pydub to process
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_full_audio_file:
+        tmp_full_audio_file.write(audio_bytes)
+        full_audio_path = tmp_full_audio_file.name
+
+    try:
+        st.info("Loading audio for chunking...")
+        audio = AudioSegment.from_file(full_audio_path)
+        chunk_length_ms = chunk_length_min * 60 * 1000 # Convert minutes to milliseconds
+        chunks = make_chunks(audio, chunk_length_ms)
+
+        transcripts = [None] * len(chunks)
+        temp_chunk_paths = []
+
+        st.info(f"Splitting audio into {len(chunks)} chunks and transcribing in parallel...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor: # Adjust max_workers as needed
+            future_to_chunk = {}
+            for i, chunk in enumerate(chunks):
+                # Save each chunk to a temp file
+                with tempfile.NamedTemporaryFile(suffix=f"_{i}.mp3", delete=False) as tmp_chunk_file:
+                    chunk.export(tmp_chunk_file.name, format="mp3")
+                    chunk_path = tmp_chunk_file.name
+                    temp_chunk_paths.append(chunk_path) # Keep track for cleanup
+                    future_to_chunk[executor.submit(transcribe_audio_whisper1, chunk_path)] = i
+
+            for future in st.progress(concurrent.futures.as_completed(future_to_chunk),
+                                       text="Transcribing chunks...",
+                                       length=len(chunks)):
+                i = future_to_chunk[future]
+                try:
+                    transcripts[i] = future.result()
+                    if transcripts[i] is None:
+                        st.error(f"Failed to transcribe chunk {i+1}. Result will be incomplete.")
+                except Exception as exc:
+                    st.error(f"Chunk {i+1} generated an exception: {exc}")
+                    transcripts[i] = "" # Assign empty string to maintain order
+
+        # Clean up temporary chunk files
+        for path in temp_chunk_paths:
+            os.remove(path)
+
+        # Concatenate transcripts
+        final_transcript = " ".join([t for t in transcripts if t is not None])
+        return final_transcript.strip()
+
+    except Exception as e:
+        st.error(f"Error during large audio transcription: {e}")
+        traceback.print_exc()
+        return None
+    finally:
+        # Clean up the full audio file
+        if os.path.exists(full_audio_path):
+            os.remove(full_audio_path)
+
+
 def summarize_filing(
     url: str | None = None,
     file: bytes | None = None,
@@ -316,7 +412,8 @@ def summarize_filing(
     
     elif url:
         if url.lower().endswith(".mp3"):
-            text = transcribe_audio_from_url_local(url)
+            #text = transcribe_audio_from_url_local(url)
+            text = transcribe_large_audio_whisper1(url, 5)
             if not text:
                 return None, "❌ Transcription failed."
             source_description = "transcribed audio file"
