@@ -191,7 +191,7 @@ if st.session_state.page == "landing":
             if bonus_magic_key == magic_key_actual:
                 with st.spinner("Processing question..."):
                     answer = answer_a_question(
-                        extracted_text=extracted_text,
+                        raw_input_text=extracted_text,
                         question=question,
                         gpt_model=gpt_model
                     )
