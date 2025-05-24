@@ -297,36 +297,171 @@ def transcribe_audio_from_url_local(mp3_url: str) -> str | None:
         return None
 
 
-def transcribe_audio_whisper1(mp3_path: str) -> str | None:
-    """
-    Transcribes an MP3 audio file using OpenAI Whisper and returns the transcript.
+# def transcribe_audio_whisper1(mp3_path: str) -> str | None:
+#     """
+#     Transcribes an MP3 audio file using OpenAI Whisper and returns the transcript.
     
-    Parameters:
-    - mp3_path (str): Path to the .mp3 file
+#     Parameters:
+#     - mp3_path (str): Path to the .mp3 file
 
-    Returns:
-    - Transcript (str) or None on failure
-    """
-    my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-    try:
-        client = OpenAI(api_key=my_api_key)
+#     Returns:
+#     - Transcript (str) or None on failure
+#     """
+#     my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+#     try:
+#         client = OpenAI(api_key=my_api_key)
 
-        with open(mp3_path, "rb") as audio_file:
-            transcript_response = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="text"
-            )
-        return transcript_response
-    except Exception as e:
-        print(f"Transcription failed: {e}")
-        return None
+#         with open(mp3_path, "rb") as audio_file:
+#             transcript_response = client.audio.transcriptions.create(
+#                 model="whisper-1",
+#                 file=audio_file,
+#                 response_format="text"
+#             )
+#         return transcript_response
+#     except Exception as e:
+#         print(f"Transcription failed: {e}")
+#         return None
 
 # --- NEW FUNCTION FOR CHUNKING AND PARALLEL TRANSCRIPTION ---
+# def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> str | None:
+#     """
+#     Downloads large audio, chunks it, transcribes chunks in parallel using Whisper-1 API,
+#     and returns the concatenated transcript.
+#     """
+#     st.info(f"Downloading audio from {mp3_url}...")
+#     content_type, audio_bytes = download_url(mp3_url)
+#     if not audio_bytes:
+#         return None
+
+#     # Save the whole file to a temporary location for pydub to process
+#     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_full_audio_file:
+#         tmp_full_audio_file.write(audio_bytes)
+#         full_audio_path = tmp_full_audio_file.name
+
+#     try:
+#         st.info("Loading audio for chunking...")
+#         audio = AudioSegment.from_file(full_audio_path)
+#         chunk_length_ms = chunk_length_min * 60 * 1000 # Convert minutes to milliseconds
+#         chunks = make_chunks(audio, chunk_length_ms)
+#         # Get total audio duration in milliseconds for cost calculation
+#         total_audio_duration_ms = len(audio) 
+
+#         transcripts = [None] * len(chunks)
+#         temp_chunk_paths = []
+
+#         st.info(f"Splitting audio into {len(chunks)} chunks and transcribing in parallel...")
+#         with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor: # Adjust max_workers as needed
+#             future_to_chunk = {}
+#             for i, chunk in enumerate(chunks):
+#                 # Save each chunk to a temp file
+#                 with tempfile.NamedTemporaryFile(suffix=f"_{i}.mp3", delete=False) as tmp_chunk_file:
+#                     chunk.export(tmp_chunk_file.name, format="mp3")
+#                     chunk_path = tmp_chunk_file.name
+#                     temp_chunk_paths.append(chunk_path) # Keep track for cleanup
+#                     future_to_chunk[executor.submit(transcribe_audio_whisper1, chunk_path)] = i
+
+#             # --- FIX STARTS HERE ---
+#             total_chunks = len(chunks)
+#             completed_chunks = 0
+            
+#             # Initialize the progress bar outside the loop
+#             progress_bar = st.progress(0, text=f"Transcribing {total_chunks} chunks...")
+    
+#             for future in concurrent.futures.as_completed(future_to_chunk):
+#                 completed_chunks += 1
+#                 # Calculate the progress percentage (0.0 to 1.0)
+#                 current_progress = completed_chunks / total_chunks
+                
+#                 # Update the progress bar
+#                 progress_bar.progress(current_progress, text=f"Transcribing chunk {completed_chunks}/{total_chunks}...")
+    
+#                 i = future_to_chunk[future]
+#                 try:
+#                     transcripts[i] = future.result()
+#                     if transcripts[i] is None:
+#                         st.error(f"Failed to transcribe chunk {i+1}. Result will be incomplete.")
+#                 except Exception as exc:
+#                     st.error(f"Chunk {i+1} generated an exception: {exc}")
+#                     transcripts[i] = "" # Assign empty string to maintain order
+    
+#             # Ensure the progress bar reaches 100% at the end
+#             progress_bar.progress(1.0, text="All chunks transcribed!")
+
+#             # --- FIX ENDS HERE ---
+
+
+#         # Clean up temporary chunk files
+#         for path in temp_chunk_paths:
+#             os.remove(path)
+
+#         # Concatenate transcripts
+#         final_transcript = " ".join([t for t in transcripts if t is not None])
+
+#         # --- COST CALCULATION & DISPLAY ---
+#         WHISPER_API_COST_PER_MINUTE = 0.006 # As of my last update, check OpenAI for current pricing       
+#         # Convert total duration from milliseconds to minutes
+#         total_audio_duration_minutes = total_audio_duration_ms / (1000 * 60)       
+#         estimated_cost = total_audio_duration_minutes * WHISPER_API_COST_PER_MINUTE        
+#         st.success(f"Estimated cost: **${estimated_cost:.4f}** (based on {total_audio_duration_minutes:.2f} minutes of audio @ ${WHISPER_API_COST_PER_MINUTE}/min).")
+        
+#         return final_transcript.strip()
+
+#     except Exception as e:
+#         st.error(f"Error during large audio transcription: {e}")
+#         traceback.print_exc()
+#         return None
+#     finally:
+#         # Clean up the full audio file
+#         if os.path.exists(full_audio_path):
+#             os.remove(full_audio_path)
+
+
+# --- Your existing transcribe_audio_whisper1 function (with retry logic) ---
+def transcribe_audio_whisper1(mp3_path: str, max_retries: int = 1, initial_backoff_sec: int = 5) -> str | None:
+    """
+    Transcribes an MP3 audio file using OpenAI Whisper and returns the transcript.
+    Includes retry logic with exponential backoff for robustness.
+    """
+    my_api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+    if not my_api_key:
+        st.error("OpenAI API key not found. Please set OPENAI_API_KEY in Streamlit secrets or environment variables.")
+        return None
+
+    client = OpenAI(api_key=my_api_key)
+
+    for attempt in range(max_retries + 1):
+        try:
+            with open(mp3_path, "rb") as audio_file:
+                audio_file.seek(0)
+                transcript_response = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="text"
+                )
+            return transcript_response
+
+        except Exception as e:
+            error_msg = f"Transcription failed for {os.path.basename(mp3_path)} (Attempt {attempt+1}/{max_retries+1}): {e}"
+            print(f"❌ {error_msg}")
+            st.warning(error_msg)
+
+            if attempt < max_retries:
+                sleep_time = initial_backoff_sec * (2 ** attempt)
+                print(f"Retrying in {sleep_time} seconds...")
+                time.sleep(sleep_time)
+            else:
+                final_error_msg = f"Max retries ({max_retries}) reached for {os.path.basename(mp3_path)}. Giving up."
+                print(f"❌ {final_error_msg}")
+                st.error(final_error_msg)
+                return None
+                
+# --- MODIFIED FUNCTION FOR CHUNKING AND PARALLEL TRANSCRIPTION WITH DOWNSAMPLING ---
 def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> str | None:
     """
-    Downloads large audio, chunks it, transcribes chunks in parallel using Whisper-1 API,
+    Downloads large audio, conditionally downsamples it if over 1 hour,
+    chunks it, transcribes chunks in parallel using Whisper-1 API,
     and returns the concatenated transcript.
+    Also calculates and displays the estimated dollar cost.
     """
     st.info(f"Downloading audio from {mp3_url}...")
     content_type, audio_bytes = download_url(mp3_url)
@@ -334,86 +469,130 @@ def transcribe_large_audio_whisper1(mp3_url: str, chunk_length_min: int = 5) -> 
         return None
 
     # Save the whole file to a temporary location for pydub to process
-    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_full_audio_file:
-        tmp_full_audio_file.write(audio_bytes)
-        full_audio_path = tmp_full_audio_file.name
+    # Using delete=False and manually removing in finally block for robust cleanup
+    tmp_full_audio_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    # Initialize paths outside try-finally for robust cleanup
+    full_audio_path = tmp_full_audio_file.name
+    downsampled_audio_path = None # Will be set if downsampling occurs
 
     try:
+        tmp_full_audio_file.write(audio_bytes)
+        tmp_full_audio_file.close() # Close the file immediately after writing
+
         st.info("Loading audio for chunking...")
         audio = AudioSegment.from_file(full_audio_path)
-        chunk_length_ms = chunk_length_min * 60 * 1000 # Convert minutes to milliseconds
-        chunks = make_chunks(audio, chunk_length_ms)
-        # Get total audio duration in milliseconds for cost calculation
-        total_audio_duration_ms = len(audio) 
+        
+        # Get total audio duration in milliseconds for cost calculation (based on original)
+        original_audio_duration_ms = len(audio) 
+        
+        audio_to_process = audio # Default to original audio
+        current_processing_path = full_audio_path # Path used for chunking
+
+        ONE_HOUR_MS = 60 * 60 * 1000 # 1 hour in milliseconds
+
+        if original_audio_duration_ms > ONE_HOUR_MS:
+            st.info("Audio is longer than 1 hour. Attempting to downsample to save memory and improve stability...")
+            
+            # Downsample to 16kHz sample rate and mono channel
+            # Changing bitrate on export can also help significantly for MP3s
+            audio_to_process = audio.set_frame_rate(16000).set_channels(1)
+            
+            # Save the downsampled audio to a new temporary file
+            tmp_downsampled_file = tempfile.NamedTemporaryFile(suffix="_downsampled.mp3", delete=False)
+            try:
+                audio_to_process.export(tmp_downsampled_file.name, format="mp3", bitrate="32k") # 32k for speech
+                tmp_downsampled_file.close()
+                downsampled_audio_path = tmp_downsampled_file.name
+                current_processing_path = downsampled_audio_path
+                st.success(f"Audio successfully downsampled to 16kHz mono. Original duration: {original_audio_duration_ms / (1000 * 60):.2f} min.")
+            except Exception as e:
+                st.error(f"Failed to downsample audio: {e}. Attempting to proceed with original file, but this may cause memory issues.")
+                # If downsampling fails, revert to original audio and path, but warn the user.
+                audio_to_process = audio
+                current_processing_path = full_audio_path
+                if os.path.exists(tmp_downsampled_file.name):
+                    os.remove(tmp_downsampled_file.name) # Clean up failed downsampled file
+        else:
+            st.info(f"Audio duration: {original_audio_duration_ms / (1000 * 60):.2f} min. No downsampling needed.")
+
+
+        chunk_length_ms = chunk_length_min * 60 * 1000
+        # Make chunks from the (potentially downsampled) audio_to_process
+        chunks = make_chunks(audio_to_process, chunk_length_ms)
 
         transcripts = [None] * len(chunks)
-        temp_chunk_paths = []
+        temp_chunk_paths = [] # Paths for individual chunks
 
         st.info(f"Splitting audio into {len(chunks)} chunks and transcribing in parallel...")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor: # Adjust max_workers as needed
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
             future_to_chunk = {}
             for i, chunk in enumerate(chunks):
-                # Save each chunk to a temp file
-                with tempfile.NamedTemporaryFile(suffix=f"_{i}.mp3", delete=False) as tmp_chunk_file:
+                tmp_chunk_file = tempfile.NamedTemporaryFile(suffix=f"_{i}.mp3", delete=False)
+                try:
+                    # Export the chunk from the (potentially downsampled) audio_to_process
                     chunk.export(tmp_chunk_file.name, format="mp3")
+                    tmp_chunk_file.close()
                     chunk_path = tmp_chunk_file.name
-                    temp_chunk_paths.append(chunk_path) # Keep track for cleanup
+                    temp_chunk_paths.append(chunk_path)
                     future_to_chunk[executor.submit(transcribe_audio_whisper1, chunk_path)] = i
+                except Exception as e:
+                    st.error(f"Error exporting chunk {i}: {e}")
+                    if os.path.exists(tmp_chunk_file.name):
+                        os.remove(tmp_chunk_file.name)
+                    transcripts[i] = ""
 
-            # --- FIX STARTS HERE ---
             total_chunks = len(chunks)
             completed_chunks = 0
             
-            # Initialize the progress bar outside the loop
-            progress_bar = st.progress(0, text=f"Transcribing {total_chunks} chunks...")
-    
+            progress_bar = st.progress(0.0, text=f"Transcribing {total_chunks} chunks...")
+
             for future in concurrent.futures.as_completed(future_to_chunk):
                 completed_chunks += 1
-                # Calculate the progress percentage (0.0 to 1.0)
                 current_progress = completed_chunks / total_chunks
-                
-                # Update the progress bar
                 progress_bar.progress(current_progress, text=f"Transcribing chunk {completed_chunks}/{total_chunks}...")
-    
+
                 i = future_to_chunk[future]
                 try:
-                    transcripts[i] = future.result()
-                    if transcripts[i] is None:
-                        st.error(f"Failed to transcribe chunk {i+1}. Result will be incomplete.")
+                    chunk_transcript = future.result()
+                    if chunk_transcript is None:
+                        st.error(f"Failed to transcribe chunk {i+1} after all retries. Result will be incomplete.")
+                        transcripts[i] = ""
+                    else:
+                        transcripts[i] = chunk_transcript
                 except Exception as exc:
-                    st.error(f"Chunk {i+1} generated an exception: {exc}")
-                    transcripts[i] = "" # Assign empty string to maintain order
-    
-            # Ensure the progress bar reaches 100% at the end
+                    st.error(f"An unexpected error occurred while getting result for chunk {i+1}: {exc}")
+                    transcripts[i] = ""
+
             progress_bar.progress(1.0, text="All chunks transcribed!")
 
-            # --- FIX ENDS HERE ---
-
-
-        # Clean up temporary chunk files
         for path in temp_chunk_paths:
-            os.remove(path)
+            if os.path.exists(path):
+                os.remove(path)
 
-        # Concatenate transcripts
-        final_transcript = " ".join([t for t in transcripts if t is not None])
-
-        # --- COST CALCULATION & DISPLAY ---
-        WHISPER_API_COST_PER_MINUTE = 0.006 # As of my last update, check OpenAI for current pricing       
-        # Convert total duration from milliseconds to minutes
-        total_audio_duration_minutes = total_audio_duration_ms / (1000 * 60)       
-        estimated_cost = total_audio_duration_minutes * WHISPER_API_COST_PER_MINUTE        
-        st.success(f"Estimated cost: **${estimated_cost:.4f}** (based on {total_audio_duration_minutes:.2f} minutes of audio @ ${WHISPER_API_COST_PER_MINUTE}/min).")
+        final_transcript = " ".join([t for t in transcripts if t is not None and t != ""])
         
+        # --- COST CALCULATION & DISPLAY (ALWAYS based on original duration) ---
+        WHISPER_API_COST_PER_MINUTE = 0.006 
+        total_audio_duration_minutes = original_audio_duration_ms / (1000 * 60)
+        estimated_cost = total_audio_duration_minutes * WHISPER_API_COST_PER_MINUTE
+        
+        st.success(f"Transcription complete! Estimated cost: **${estimated_cost:.4f}** (based on {total_audio_duration_minutes:.2f} minutes of audio @ ${WHISPER_API_COST_PER_MINUTE}/min).")
+        st.info("Please verify the latest pricing on the OpenAI API documentation.")
+
         return final_transcript.strip()
 
     except Exception as e:
-        st.error(f"Error during large audio transcription: {e}")
+        st.error(f"An error occurred during large audio transcription process: {e}")
         traceback.print_exc()
         return None
     finally:
-        # Clean up the full audio file
+        # Clean up the original full audio file
         if os.path.exists(full_audio_path):
             os.remove(full_audio_path)
+        # Clean up the downsampled audio file if it was created
+        if downsampled_audio_path and os.path.exists(downsampled_audio_path):
+            os.remove(downsampled_audio_path)
+
 
 
 def summarize_filing(
