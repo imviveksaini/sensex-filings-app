@@ -94,17 +94,15 @@ Understand the following text and analyze it carefully.
 
 Respond **only** in valid JSON format with exactly the following keys:
 1. "date": extract the date on which the text has been reported, in yyyy-mm-dd format.
-2. "summary_management_discussion": a brief summary of the financial information in the text reported by the CFO. Maximum 5 lines, bullet points.
-3. "summary_Q&A": a brief summary of the answers given by management asked by analysts. Focus on key risks and opportunities for the next 1-2 quarters. Maximum 5 lines, bullet points.
-4. "the good things reported by management": a brief summary of the good things in the business financials from the answers given by management asked by analysts. Maximum 5 lines, bullet points.
-5. "the bad things reported by management": a brief summary of the bad things/red flags in the business financials from the answers given by management asked by analysts. Maximum 5 lines, bullet points.
-6. "summary_Q&A": a brief summary of the answers given by management asked by analysts. Focus on key risks and opportunities for the next 1-2 quarters. Maximum 5 lines, bullet points.
-7. "bullishness_indicator (-100 to 100)": how bullish are you on its stock based on the information in the text. 100 = very bullish, -100 = very bearish.
+2. "business model": What's the business model of this company, what are the key revenue drivers, what are the key cost drivers? Answer based on the earnings call text provided. Maximum 5 lines, bullet points.
+3. "summary_management_discussion": a brief summary of the financial information in the text reported by the CFO. Maximum 5 lines, bullet points.
+4. "summary_Q&A": a brief summary of the answers given by management asked by analysts. Focus on key risks and opportunities for the next 1-2 quarters. Maximum 5 lines, bullet points.
+5. "the good things reported by management": a brief summary of the good things in the business financials from the answers given by management asked by analysts. Maximum 5 lines, bullet points.
+6. "tailwinds": if management talked about any business tailwinds that could boost growth in future, write here. Maximum 3 lines, bullet points. Write only when you're very sure.
+7. "the bad things reported by management": a brief summary of the bad things/red flags in the business financials from the answers given by management asked by analysts. Maximum 5 lines, bullet points.
 8. "headwinds": if management talked about any business headwinds that could deter growth in future, write here. Maximum 3 lines, bullet points. Write only when you're very sure.
-9. "tailwinds": if management talked about any business tailwinds that could boost growth in future, write here. Maximum 3 lines, bullet points. Write only when you're very sure.
-10. "management_guidance": Write here if company management provided any revenue growth, margin or eps growth guidance or any other forward looking statements on company prospects. Maximum 3 lines, bullet points.
-11. "business model": What's the bsuiness model of this company, what are the key revenue drivers, what are the key cost drivers? Answer based on the text provided. Maximum 5 lines, bullet points.
-
+9. "management_guidance": Write here if company management provided any revenue growth, margin or eps growth guidance or any other forward looking statements on company prospects. Maximum 3 lines, bullet points.
+10. "bullishness_indicator (-100 to 100)": how bullish are you on this stock for the next 1-3 quarters based on the text output you generated above. 100 = very bullish, -100 = very bearish.
 
 
 Filing text:
