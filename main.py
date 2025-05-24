@@ -185,18 +185,18 @@ if st.session_state.page == "landing":
 
 
         with st.form("Ask a question:"):
-        question = st.text_input("Enter a question here:")
-        question_submitted = st.form_submit_button("Submit")
-        if question_submitted:
-            if bonus_magic_key == magic_key_actual:
-                with st.spinner("Processing question..."):
-                    answer = answer_a_question(
-                        raw_input_text=extracted_text,
-                        question=question,
-                        gpt_model=gpt_model
-                    )
-                st.session_state["extracted_answer"] = answer
-                st.code(st.session_state["extracted_answer"], language="markdown")
+            question = st.text_input("Enter a question here:")
+            question_submitted = st.form_submit_button("Submit")
+            if question_submitted:
+                if bonus_magic_key == magic_key_actual:
+                    with st.spinner("Processing question..."):
+                        answer = answer_a_question(
+                            raw_input_text=extracted_text,
+                            question=question,
+                            gpt_model=gpt_model
+                        )
+                    st.session_state["extracted_answer"] = answer
+                    st.code(st.session_state["extracted_answer"], language="markdown")
             
 
     st.stop()
