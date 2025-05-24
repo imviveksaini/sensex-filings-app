@@ -12,5 +12,5 @@ sentencepiece
 openai
 zenrows
 torch>=2.2.0
-openai-whisper==20230314
+openai-whisper==20231117
 
