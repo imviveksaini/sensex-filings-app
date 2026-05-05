@@ -12,5 +12,6 @@ sentencepiece
 openai
 zenrows
 torch>=2.2.0
+setuptools
 openai-whisper==20231117
 pydub
